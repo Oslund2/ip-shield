@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, GitFork, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Shield, GitFork, Mail, Lock, ArrowRight, Zap } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface LoginPageProps {
@@ -7,7 +7,7 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onToggleSignUp }: LoginPageProps) {
-  const { signIn, signInWithGitHub } = useAuth();
+  const { signIn, signInWithGitHub, signInAsGuest } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -81,8 +81,23 @@ export function LoginPage({ onToggleSignUp }: LoginPageProps) {
           </div>
 
           <button
+            onClick={async () => {
+              setError('');
+              setLoading(true);
+              const { error } = await signInAsGuest();
+              if (error) setError(error.message);
+              setLoading(false);
+            }}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-shield-600 to-indigo-600 text-white font-semibold py-4 px-4 rounded-xl hover:shadow-lg hover:shadow-shield-600/25 transition-all mb-4 text-lg disabled:opacity-50"
+          >
+            <Zap className="w-5 h-5" />
+            {loading ? 'Starting...' : 'Get Started — No Account Needed'}
+          </button>
+
+          <button
             onClick={handleGitHub}
-            className="w-full flex items-center justify-center gap-3 bg-gray-900 text-white font-semibold py-3.5 px-4 rounded-xl hover:bg-gray-800 transition-all hover:shadow-md mb-8"
+            className="w-full flex items-center justify-center gap-3 bg-gray-900 text-white font-semibold py-3.5 px-4 rounded-xl hover:bg-gray-800 transition-all hover:shadow-md mb-6"
           >
             <GitFork className="w-5 h-5" />
             Continue with GitHub

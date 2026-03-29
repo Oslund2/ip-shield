@@ -9,6 +9,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGitHub: () => Promise<{ error: Error | null }>;
+  signInAsGuest: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -56,12 +57,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const signInAsGuest = async () => {
+    // Try Supabase anonymous auth first
+    const { error: anonError } = await supabase.auth.signInAnonymously();
+    if (!anonError) return { error: null };
+
+    // Fallback: use the existing demo account
+    const { error } = await supabase.auth.signInWithPassword({
+      email: 'guest@ipshield.app',
+      password: 'ipshield-guest-2026',
+    });
+    if (!error) return { error: null };
+
+    // Last resort: create the guest account then sign in
+    await supabase.auth.signUp({
+      email: 'guest@ipshield.app',
+      password: 'ipshield-guest-2026',
+    });
+    const { error: retryError } = await supabase.auth.signInWithPassword({
+      email: 'guest@ipshield.app',
+      password: 'ipshield-guest-2026',
+    });
+    return { error: retryError as Error | null };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithGitHub, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signInWithGitHub, signInAsGuest, signOut }}>
       {children}
     </AuthContext.Provider>
   );
