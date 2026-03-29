@@ -320,20 +320,21 @@ export async function createPatentApplication(
       project_id: projectId,
       user_id: userId,
       title: input.title || appData.title || 'Untitled Patent Application',
-      filing_type: appData.filing_type || 'provisional',
       status: 'draft',
-      inventor_name: appData.inventor_name || null,
-      inventor_citizenship: appData.inventor_citizenship || 'US Citizen',
-      invention_description: input.inventionDescription || appData.invention_description || null,
-      technical_field: input.technicalField || appData.technical_field || null,
-      problem_solved: input.problemSolved || appData.problem_solved || null,
-      key_features: input.keyFeatures || appData.key_features || [],
       specification: input.specification || appData.specification || null,
       abstract: input.abstract || appData.abstract || null,
-      prior_art_patents: appData.prior_art_patents || [],
-      prior_art_literature: appData.prior_art_literature || [],
-      metadata: appData.metadata || {},
-      version: 1
+      field_of_invention: input.technicalField || appData.field_of_invention || null,
+      detailed_description: input.inventionDescription || appData.detailed_description || null,
+      metadata: {
+        filing_type: appData.filing_type || 'provisional',
+        inventor_name: appData.inventor_name || null,
+        inventor_citizenship: appData.inventor_citizenship || 'US Citizen',
+        problem_solved: input.problemSolved || appData.problem_solved || null,
+        key_features: input.keyFeatures || appData.key_features || [],
+        prior_art_patents: appData.prior_art_patents || [],
+        prior_art_literature: appData.prior_art_literature || [],
+        version: 1,
+      },
     }])
     .select()
     .single();
@@ -342,27 +343,33 @@ export async function createPatentApplication(
   return application;
 }
 
+// Columns that exist in the patent_applications table
+const VALID_PATENT_COLUMNS = new Set([
+  'title', 'status', 'abstract', 'specification', 'field_of_invention',
+  'background_art', 'summary_invention', 'detailed_description',
+  'prior_art_search_status', 'prior_art_search_completed_at',
+  'novelty_score', 'novelty_analysis_id', 'differentiation_analysis',
+  'claims_generation_status', 'drawings_generation_status',
+  'specification_generation_status', 'full_application_status',
+  'metadata', 'inventors', 'entity_status', 'correspondence_address',
+  'attorney_info', 'cpc_classification', 'updated_at',
+]);
+
 export async function updatePatentApplication(
   applicationId: string,
   updates: Partial<PatentApplication>
 ): Promise<void> {
-  const { data: current, error: fetchError } = await (supabase as any)
-    .from('patent_applications')
-    .select('version')
-    .eq('id', applicationId)
-    .maybeSingle();
-
-  if (fetchError) throw fetchError;
-
-  const currentVersion = current?.version || 1;
+  // Filter to only columns that exist in the DB table
+  const safeUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  for (const [key, value] of Object.entries(updates)) {
+    if (VALID_PATENT_COLUMNS.has(key)) {
+      safeUpdates[key] = value;
+    }
+  }
 
   const { error } = await (supabase as any)
     .from('patent_applications')
-    .update({
-      ...updates,
-      version: currentVersion + 1,
-      updated_at: new Date().toISOString()
-    })
+    .update(safeUpdates)
     .eq('id', applicationId);
 
   if (error) throw error;
