@@ -25,6 +25,12 @@ const NOVELTY_COLORS = {
   weak: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 
+const NOVELTY_ACCENT = {
+  strong: 'border-l-green-500',
+  moderate: 'border-l-amber-400',
+  weak: 'border-l-gray-300',
+};
+
 export function AnalysisResults({ onNavigate }: AnalysisResultsProps) {
   const { currentProject } = useProject();
   const [features, setFeatures] = useState<ExtractedFeature[]>([]);
@@ -70,104 +76,113 @@ export function AnalysisResults({ onNavigate }: AnalysisResultsProps) {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Summary header */}
-      <div className="bg-gradient-to-r from-shield-800 to-shield-600 rounded-2xl p-8 text-white mb-8">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">{currentProject?.name}</h2>
-            <p className="text-shield-200 mt-1 text-sm">{currentProject?.source_url || 'Uploaded zip file'}</p>
-          </div>
-          <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1.5">
-            <Sparkles className="w-4 h-4" />
-            <span className="text-sm font-medium">{features.length} features found</span>
-          </div>
-        </div>
+      {/* Hero stats card */}
+      <div className="bg-gradient-to-r from-shield-600 via-blue-500 to-indigo-600 rounded-3xl p-10 text-white mb-10 relative overflow-hidden">
+        {/* Glass-morphism overlay shapes */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3" />
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
 
-        {currentProject?.analysis_summary && (
-          <p className="mt-4 text-shield-100 text-sm leading-relaxed">{currentProject.analysis_summary}</p>
-        )}
+        <div className="relative z-10">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h2 className="text-3xl font-bold">{currentProject?.name}</h2>
+              <p className="text-blue-100 mt-2 text-base">{currentProject?.source_url || 'Uploaded zip file'}</p>
+            </div>
+            <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2.5 border border-white/20">
+              <Sparkles className="w-5 h-5" />
+              <span className="font-semibold text-base">{features.length} features found</span>
+            </div>
+          </div>
 
-        <div className="grid grid-cols-3 gap-4 mt-6">
-          <div className="bg-white/10 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{coreFeatures.length}</div>
-            <div className="text-xs text-shield-200">Core Innovations</div>
-          </div>
-          <div className="bg-white/10 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{strongFeatures.length}</div>
-            <div className="text-xs text-shield-200">Strong Novelty</div>
-          </div>
-          <div className="bg-white/10 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{features.length}</div>
-            <div className="text-xs text-shield-200">Total Features</div>
+          {currentProject?.analysis_summary && (
+            <p className="text-blue-100 text-base leading-relaxed mb-8 max-w-2xl">{currentProject.analysis_summary}</p>
+          )}
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 text-center border border-white/10">
+              <div className="text-3xl font-bold">{coreFeatures.length}</div>
+              <div className="text-sm text-blue-100 mt-1">Core Innovations</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 text-center border border-white/10">
+              <div className="text-3xl font-bold">{strongFeatures.length}</div>
+              <div className="text-sm text-blue-100 mt-1">Strong Novelty</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 text-center border border-white/10">
+              <div className="text-3xl font-bold">{features.length}</div>
+              <div className="text-sm text-blue-100 mt-1">Total Features</div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Action cards */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">
         <button
           onClick={onNavigate}
-          className="flex flex-col items-center gap-3 p-6 bg-white border border-gray-200 rounded-xl hover:border-shield-500 hover:shadow-md transition-all group"
+          className="flex flex-col items-center gap-4 p-8 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-shield-200 transition-all group"
         >
-          <div className="w-12 h-12 bg-shield-100 rounded-xl flex items-center justify-center group-hover:bg-shield-200 transition-colors">
-            <FileText className="w-6 h-6 text-shield-700" />
+          <div className="w-16 h-16 bg-gradient-to-br from-shield-100 to-blue-100 rounded-2xl flex items-center justify-center group-hover:from-shield-200 group-hover:to-blue-200 transition-colors">
+            <FileText className="w-8 h-8 text-shield-700" />
           </div>
           <div className="text-center">
-            <div className="font-semibold text-gray-900">Patents</div>
-            <div className="text-xs text-gray-500 mt-1">Generate applications</div>
+            <div className="font-semibold text-gray-900 text-lg">Patents</div>
+            <div className="text-sm text-gray-500 mt-1">Generate applications</div>
           </div>
-          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-shield-600" />
+          <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-shield-600 group-hover:translate-x-1 transition-all" />
         </button>
 
         <button
           onClick={onNavigate}
-          className="flex flex-col items-center gap-3 p-6 bg-white border border-gray-200 rounded-xl hover:border-shield-500 hover:shadow-md transition-all group"
+          className="flex flex-col items-center gap-4 p-8 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-violet-200 transition-all group"
         >
-          <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-            <Scale className="w-6 h-6 text-purple-700" />
+          <div className="w-16 h-16 bg-gradient-to-br from-violet-100 to-purple-100 rounded-2xl flex items-center justify-center group-hover:from-violet-200 group-hover:to-purple-200 transition-colors">
+            <Scale className="w-8 h-8 text-violet-700" />
           </div>
           <div className="text-center">
-            <div className="font-semibold text-gray-900">Copyrights</div>
-            <div className="text-xs text-gray-500 mt-1">Register works</div>
+            <div className="font-semibold text-gray-900 text-lg">Copyrights</div>
+            <div className="text-sm text-gray-500 mt-1">Register works</div>
           </div>
-          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-purple-600" />
+          <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-violet-600 group-hover:translate-x-1 transition-all" />
         </button>
 
         <button
           onClick={onNavigate}
-          className="flex flex-col items-center gap-3 p-6 bg-white border border-gray-200 rounded-xl hover:border-shield-500 hover:shadow-md transition-all group"
+          className="flex flex-col items-center gap-4 p-8 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-amber-200 transition-all group"
         >
-          <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center group-hover:bg-amber-200 transition-colors">
-            <Stamp className="w-6 h-6 text-amber-700" />
+          <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-yellow-100 rounded-2xl flex items-center justify-center group-hover:from-amber-200 group-hover:to-yellow-200 transition-colors">
+            <Stamp className="w-8 h-8 text-amber-700" />
           </div>
           <div className="text-center">
-            <div className="font-semibold text-gray-900">Trademarks</div>
-            <div className="text-xs text-gray-500 mt-1">Protect marks</div>
+            <div className="font-semibold text-gray-900 text-lg">Trademarks</div>
+            <div className="text-sm text-gray-500 mt-1">Protect marks</div>
           </div>
-          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600" />
+          <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
         </button>
       </div>
 
       {/* Feature list */}
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Discovered Features</h3>
-      <div className="space-y-3">
+      <h3 className="text-xl font-bold text-gray-900 mb-5">Discovered Features</h3>
+      <div className="space-y-4">
         {features.map((feature, idx) => (
-          <div key={idx} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+          <div
+            key={idx}
+            className={`bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all border-l-4 ${NOVELTY_ACCENT[feature.noveltyStrength]}`}
+          >
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2.5 mb-2">
                   {feature.isCoreInnovation && (
-                    <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                    <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
                   )}
-                  <h4 className="font-medium text-gray-900">{feature.name}</h4>
+                  <h4 className="font-semibold text-gray-900 text-base">{feature.name}</h4>
                 </div>
-                <p className="text-sm text-gray-600 mb-2">{feature.description}</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-shield-100 text-shield-700">
-                    <Code className="w-3 h-3" />
+                <p className="text-sm text-gray-600 mb-3 leading-relaxed">{feature.description}</p>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-shield-50 text-shield-700 border border-shield-100">
+                    <Code className="w-3.5 h-3.5" />
                     {TYPE_LABELS[feature.type] || feature.type}
                   </span>
-                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ${NOVELTY_COLORS[feature.noveltyStrength]}`}>
+                  <span className={`inline-flex px-3 py-1 rounded-lg text-xs font-semibold border ${NOVELTY_COLORS[feature.noveltyStrength]}`}>
                     {feature.noveltyStrength} novelty
                   </span>
                   {feature.sourceFiles.length > 0 && (
@@ -179,9 +194,13 @@ export function AnalysisResults({ onNavigate }: AnalysisResultsProps) {
               </div>
             </div>
             {feature.technicalDetails && (
-              <details className="mt-3">
-                <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">Technical details</summary>
-                <p className="text-sm text-gray-600 mt-2 bg-gray-50 rounded p-3">{feature.technicalDetails}</p>
+              <details className="mt-4 group/details">
+                <summary className="text-sm text-gray-500 cursor-pointer hover:text-shield-600 font-medium transition-colors">
+                  Technical details
+                </summary>
+                <p className="text-sm text-gray-600 mt-3 bg-slate-50 rounded-xl p-4 leading-relaxed border border-gray-100 transition-all">
+                  {feature.technicalDetails}
+                </p>
               </details>
             )}
           </div>

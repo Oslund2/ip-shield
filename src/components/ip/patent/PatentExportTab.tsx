@@ -70,50 +70,68 @@ export function PatentExportTab({ application, onExportPDF, onExportSectionPDF, 
   ];
 
   const completenessPercent = Math.round((completenessItems.filter(i => i.complete).length / completenessItems.length) * 100);
+  const circumference = 2 * Math.PI * 36;
+  const strokeDashoffset = circumference - (completenessPercent / 100) * circumference;
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-slate-800">Export Application</h2>
+    <div className="space-y-8">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+          <Download className="w-4 h-4 text-blue-600" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Export Application</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Download your patent application in various formats</p>
+        </div>
+      </div>
 
-      {/* Primary Export Actions */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Primary Export Actions - large clickable cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <button
           onClick={handlePrint}
-          className="flex flex-col items-center gap-2.5 p-5 bg-white border border-slate-200 rounded-lg hover:border-shield-300 hover:shadow-sm transition-all group"
+          className="flex flex-col items-center gap-3 p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-md transition-all duration-200 group"
         >
-          <Printer className="w-8 h-8 text-shield-600 group-hover:scale-105 transition-transform" />
+          <div className="w-14 h-14 rounded-2xl bg-gray-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
+            <Printer className="w-6 h-6 text-gray-500 group-hover:text-blue-600 transition-colors" />
+          </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-slate-800">Print</p>
-            <p className="text-xs text-slate-500">Print document</p>
+            <p className="text-sm font-semibold text-gray-800">Print</p>
+            <p className="text-xs text-gray-400 mt-0.5">Print document</p>
           </div>
         </button>
 
         <button
           onClick={onExportPDF}
           disabled={exporting}
-          className={`flex flex-col items-center gap-2.5 p-5 bg-white border rounded-lg transition-all group ${
-            exporting ? 'border-slate-200 opacity-60 cursor-not-allowed' : 'border-slate-200 hover:border-shield-300 hover:shadow-sm'
+          className={`flex flex-col items-center gap-3 p-6 rounded-2xl transition-all duration-200 group ${
+            exporting
+              ? 'bg-gray-50 border border-gray-200 opacity-60 cursor-not-allowed'
+              : 'bg-gradient-to-br from-blue-600 to-indigo-600 border border-blue-600 hover:shadow-lg hover:shadow-blue-200'
           }`}
         >
-          {exporting ? (
-            <Loader2 className="w-8 h-8 text-shield-600 animate-spin" />
-          ) : (
-            <Download className="w-8 h-8 text-shield-600 group-hover:scale-105 transition-transform" />
-          )}
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${exporting ? 'bg-gray-100' : 'bg-white/20'}`}>
+            {exporting ? (
+              <Loader2 className="w-6 h-6 text-gray-500 animate-spin" />
+            ) : (
+              <Download className="w-6 h-6 text-white" />
+            )}
+          </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-slate-800">{exporting ? 'Generating...' : 'Export PDF'}</p>
-            <p className="text-xs text-slate-500">Complete application</p>
+            <p className={`text-sm font-semibold ${exporting ? 'text-gray-600' : 'text-white'}`}>{exporting ? 'Generating...' : 'Export PDF'}</p>
+            <p className={`text-xs mt-0.5 ${exporting ? 'text-gray-400' : 'text-blue-200'}`}>Complete application</p>
           </div>
         </button>
 
         <button
           onClick={handleCopyText}
-          className="flex flex-col items-center gap-2.5 p-5 bg-white border border-slate-200 rounded-lg hover:border-shield-300 hover:shadow-sm transition-all group"
+          className="flex flex-col items-center gap-3 p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-md transition-all duration-200 group"
         >
-          <Copy className="w-8 h-8 text-shield-600 group-hover:scale-105 transition-transform" />
+          <div className="w-14 h-14 rounded-2xl bg-gray-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
+            <Copy className="w-6 h-6 text-gray-500 group-hover:text-blue-600 transition-colors" />
+          </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-slate-800">Copy Text</p>
-            <p className="text-xs text-slate-500">To clipboard</p>
+            <p className="text-sm font-semibold text-gray-800">Copy Text</p>
+            <p className="text-xs text-gray-400 mt-0.5">To clipboard</p>
           </div>
         </button>
 
@@ -127,38 +145,40 @@ export function PatentExportTab({ application, onExportPDF, onExportSectionPDF, 
             a.click();
             URL.revokeObjectURL(url);
           }}
-          className="flex flex-col items-center gap-2.5 p-5 bg-white border border-slate-200 rounded-lg hover:border-shield-300 hover:shadow-sm transition-all group"
+          className="flex flex-col items-center gap-3 p-6 bg-white border border-gray-100 rounded-2xl hover:border-blue-200 hover:shadow-md transition-all duration-200 group"
         >
-          <FileText className="w-8 h-8 text-shield-600 group-hover:scale-105 transition-transform" />
+          <div className="w-14 h-14 rounded-2xl bg-gray-50 group-hover:bg-blue-50 flex items-center justify-center transition-colors">
+            <FileText className="w-6 h-6 text-gray-500 group-hover:text-blue-600 transition-colors" />
+          </div>
           <div className="text-center">
-            <p className="text-sm font-medium text-slate-800">Spec TXT</p>
-            <p className="text-xs text-slate-500">Download text</p>
+            <p className="text-sm font-semibold text-gray-800">Spec TXT</p>
+            <p className="text-xs text-gray-400 mt-0.5">Download text</p>
           </div>
         </button>
       </div>
 
       {/* Export Options */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-slate-700 mb-3">Export Options</h3>
-        <label className="flex items-center gap-3 cursor-pointer">
+      <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4 pb-3 border-b border-gray-100">Export Options</h3>
+        <label className="flex items-center gap-4 cursor-pointer group">
           <input
             type="checkbox"
             checked={exportOptions.includeExemplaryClaims}
             onChange={(e) => onExportOptionsChange({ ...exportOptions, includeExemplaryClaims: e.target.checked })}
-            className="w-4 h-4 text-shield-600 border-slate-300 rounded focus:ring-shield-500"
+            className="w-5 h-5 text-blue-600 border-gray-300 rounded-md focus:ring-blue-500"
           />
           <div>
-            <span className="text-sm font-medium text-slate-700">Include "Exemplary Claims" header</span>
-            <p className="text-xs text-slate-500">Adds header before claims section (internal review only)</p>
+            <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">Include "Exemplary Claims" header</span>
+            <p className="text-xs text-gray-400 mt-0.5">Adds header before claims section (internal review only)</p>
           </div>
         </label>
       </div>
 
       {/* Section Exports */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-slate-700 mb-2">Export Individual Sections</h3>
-        <p className="text-xs text-slate-500 mb-4">Download each section as a separate PDF</p>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+      <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">Export Individual Sections</h3>
+        <p className="text-xs text-gray-400 mb-5">Download each section as a separate PDF</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {sectionExports.map(({ id, label, icon: Icon, description, hasContent }) => {
             const isExportingThis = exportingSection === id;
             return (
@@ -166,60 +186,79 @@ export function PatentExportTab({ application, onExportPDF, onExportSectionPDF, 
                 key={id}
                 onClick={() => onExportSectionPDF(id)}
                 disabled={isExportingThis || !!exportingSection}
-                className={`flex flex-col items-center gap-1.5 p-3 border rounded-lg transition-all ${
+                className={`flex flex-col items-center gap-2 p-4 border rounded-xl transition-all duration-150 ${
                   isExportingThis
-                    ? 'border-shield-300 bg-shield-50'
+                    ? 'border-blue-300 bg-blue-50 shadow-sm'
                     : hasContent
-                    ? 'border-slate-200 hover:border-shield-300 hover:bg-slate-50'
-                    : 'border-slate-100 bg-slate-50/50 opacity-50'
-                } ${exportingSection && !isExportingThis ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    ? 'border-gray-100 bg-white hover:border-blue-200 hover:shadow-sm'
+                    : 'border-gray-100 bg-gray-50/50 opacity-40'
+                } ${exportingSection && !isExportingThis ? 'opacity-30 cursor-not-allowed' : ''}`}
               >
-                {isExportingThis ? (
-                  <Loader2 className="w-5 h-5 text-shield-600 animate-spin" />
-                ) : (
-                  <Icon className={`w-5 h-5 ${hasContent ? 'text-shield-600' : 'text-slate-400'}`} />
-                )}
-                <p className={`text-xs font-medium ${hasContent ? 'text-slate-700' : 'text-slate-400'}`}>{label}</p>
-                <p className="text-xs text-slate-400">{isExportingThis ? 'Generating...' : description}</p>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  isExportingThis ? 'bg-blue-100' : hasContent ? 'bg-gray-50' : 'bg-gray-100'
+                }`}>
+                  {isExportingThis ? (
+                    <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                  ) : (
+                    <Icon className={`w-5 h-5 ${hasContent ? 'text-blue-600' : 'text-gray-300'}`} />
+                  )}
+                </div>
+                <p className={`text-xs font-semibold ${hasContent ? 'text-gray-700' : 'text-gray-400'}`}>{label}</p>
+                <p className="text-xs text-gray-400">{isExportingThis ? 'Generating...' : description}</p>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Completeness Checklist */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-slate-700">Completeness</h3>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-            completenessPercent === 100
-              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-              : 'bg-amber-50 text-amber-700 border border-amber-200'
-          }`}>
-            {completenessPercent}%
-          </span>
+      {/* Completeness Checklist with Progress Ring */}
+      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center gap-5 mb-6">
+          {/* Progress Ring */}
+          <div className="relative flex-shrink-0">
+            <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="36" fill="none" strokeWidth="6" className="stroke-gray-100" />
+              <circle
+                cx="40" cy="40" r="36" fill="none" strokeWidth="6"
+                strokeLinecap="round"
+                className={`${completenessPercent === 100 ? 'stroke-emerald-500' : 'stroke-blue-500'} transition-all duration-700`}
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-lg font-bold ${completenessPercent === 100 ? 'text-emerald-600' : 'text-blue-600'}`}>
+                {completenessPercent}%
+              </span>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Application Completeness</h3>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {completenessPercent === 100
+                ? 'All sections complete - ready to export!'
+                : `${completenessItems.filter(i => i.complete).length} of ${completenessItems.length} sections complete`
+              }
+            </p>
+          </div>
         </div>
-        <div className="w-full bg-slate-100 rounded-full h-1.5 mb-4 overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              completenessPercent === 100 ? 'bg-emerald-500' : 'bg-shield-500'
-            }`}
-            style={{ width: `${completenessPercent}%` }}
-          />
-        </div>
-        <ul className="space-y-2">
+        <div className="space-y-2.5">
           {completenessItems.map((item, i) => (
-            <li key={i} className="flex items-center gap-2.5 text-sm">
+            <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${item.complete ? 'bg-emerald-50/50' : 'bg-amber-50/50'}`}>
               {item.complete ? (
-                <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                <div className="w-6 h-6 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                </div>
               ) : (
-                <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                </div>
               )}
-              <span className="text-slate-600">{item.label}</span>
-              <span className="text-xs text-slate-400 ml-auto">{item.detail}</span>
-            </li>
+              <span className={`text-sm font-medium ${item.complete ? 'text-gray-700' : 'text-gray-500'}`}>{item.label}</span>
+              <span className="text-xs text-gray-400 ml-auto">{item.detail}</span>
+            </div>
           ))}
-        </ul>
+        </div>
       </div>
 
       {/* Print Content (hidden) */}

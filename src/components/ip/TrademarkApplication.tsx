@@ -41,24 +41,24 @@ import {
 
 // --- Config ---
 
-const STATUS_CONFIG: Record<TrademarkStatus, { label: string; color: string; bg: string; icon: typeof Clock }> = {
-  draft: { label: 'Draft', color: 'text-gray-700', bg: 'bg-gray-100', icon: Edit3 },
-  pending_review: { label: 'Pending Review', color: 'text-amber-700', bg: 'bg-amber-50', icon: Clock },
-  filed: { label: 'Filed', color: 'text-blue-700', bg: 'bg-blue-50', icon: FileText },
-  published: { label: 'Published', color: 'text-purple-700', bg: 'bg-purple-50', icon: Eye },
-  opposed: { label: 'Opposed', color: 'text-orange-700', bg: 'bg-orange-50', icon: AlertCircle },
-  registered: { label: 'Registered', color: 'text-emerald-700', bg: 'bg-emerald-50', icon: CheckCircle },
-  abandoned: { label: 'Abandoned', color: 'text-gray-500', bg: 'bg-gray-50', icon: X },
-  cancelled: { label: 'Cancelled', color: 'text-red-700', bg: 'bg-red-50', icon: X },
-  expired: { label: 'Expired', color: 'text-red-700', bg: 'bg-red-50', icon: Clock }
+const STATUS_CONFIG: Record<TrademarkStatus, { label: string; color: string; bg: string; dot: string; icon: typeof Clock }> = {
+  draft: { label: 'Draft', color: 'text-gray-700', bg: 'bg-gray-100', dot: 'bg-gray-400', icon: Edit3 },
+  pending_review: { label: 'Pending Review', color: 'text-amber-700', bg: 'bg-amber-50', dot: 'bg-amber-400', icon: Clock },
+  filed: { label: 'Filed', color: 'text-blue-700', bg: 'bg-blue-50', dot: 'bg-blue-400', icon: FileText },
+  published: { label: 'Published', color: 'text-purple-700', bg: 'bg-purple-50', dot: 'bg-purple-400', icon: Eye },
+  opposed: { label: 'Opposed', color: 'text-orange-700', bg: 'bg-orange-50', dot: 'bg-orange-400', icon: AlertCircle },
+  registered: { label: 'Registered', color: 'text-emerald-700', bg: 'bg-emerald-50', dot: 'bg-emerald-400', icon: CheckCircle },
+  abandoned: { label: 'Abandoned', color: 'text-gray-500', bg: 'bg-gray-50', dot: 'bg-gray-300', icon: X },
+  cancelled: { label: 'Cancelled', color: 'text-red-700', bg: 'bg-red-50', dot: 'bg-red-400', icon: X },
+  expired: { label: 'Expired', color: 'text-red-700', bg: 'bg-red-50', dot: 'bg-red-400', icon: Clock }
 };
 
-const MARK_TYPE_CONFIG: Record<MarkType, { label: string; icon: typeof Type }> = {
-  word_mark: { label: 'Word Mark', icon: Type },
-  design_mark: { label: 'Design Mark', icon: ImageIcon },
-  combined_mark: { label: 'Combined Mark', icon: Layers },
-  sound_mark: { label: 'Sound Mark', icon: Tag },
-  motion_mark: { label: 'Motion Mark', icon: Tag }
+const MARK_TYPE_CONFIG: Record<MarkType, { label: string; icon: typeof Type; description: string }> = {
+  word_mark: { label: 'Word Mark', icon: Type, description: 'Text-only trademark' },
+  design_mark: { label: 'Design Mark', icon: ImageIcon, description: 'Logo or graphic element' },
+  combined_mark: { label: 'Combined Mark', icon: Layers, description: 'Text with design' },
+  sound_mark: { label: 'Sound Mark', icon: Tag, description: 'Audio trademark' },
+  motion_mark: { label: 'Motion Mark', icon: Tag, description: 'Animated trademark' }
 };
 
 const FILING_BASIS_OPTIONS: { value: FilingBasis; label: string; description: string }[] = [
@@ -77,6 +77,8 @@ const OWNER_TYPE_OPTIONS: { value: OwnerType; label: string }[] = [
   { value: 'joint_venture', label: 'Joint Venture' },
   { value: 'other', label: 'Other' }
 ];
+
+const STATUS_FLOW: TrademarkStatus[] = ['draft', 'pending_review', 'filed', 'published', 'registered'];
 
 type ViewMode = 'list' | 'detail';
 
@@ -261,16 +263,16 @@ export function TrademarkApplication() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-shield-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
       </div>
     );
   }
 
   if (!projectId) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-        <Shield className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-        <p className="text-gray-500">Select a project to manage trademark applications.</p>
+      <div className="card p-16 text-center">
+        <Shield className="w-14 h-14 mx-auto mb-4 text-gray-200" />
+        <p className="text-gray-500 text-base">Select a project to manage trademark applications.</p>
       </div>
     );
   }
@@ -278,11 +280,11 @@ export function TrademarkApplication() {
   // --- Detail View ---
   if (viewMode === 'detail' && selected) {
     const statusCfg = STATUS_CONFIG[selected.status];
-    const StatusIcon = statusCfg.icon;
     const markCfg = MARK_TYPE_CONFIG[selected.mark_type];
     const MarkIcon = markCfg.icon;
     const completion = validateTrademarkCompleteness(selected);
     const completePct = Math.round(((8 - completion.missingFields.length) / 8) * 100);
+    const currentStepIdx = STATUS_FLOW.indexOf(selected.status);
 
     return (
       <div className="space-y-6">
@@ -292,20 +294,20 @@ export function TrademarkApplication() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => { setViewMode('list'); setSelected(null); }}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="p-2.5 rounded-xl hover:bg-amber-50 transition-all duration-200 group"
           >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
+            <ArrowLeft className="w-5 h-5 text-gray-400 group-hover:text-amber-600 transition-colors" />
           </button>
           <div className="flex-1">
-            <h2 className="text-xl font-semibold text-shield-800">
+            <h2 className="text-2xl font-bold text-gray-900">
               {selected.mark_text || 'Design Mark'}
             </h2>
-            <div className="flex items-center gap-3 mt-1">
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusCfg.bg} ${statusCfg.color}`}>
-                <StatusIcon className="w-3 h-3" />
+            <div className="flex items-center gap-3 mt-1.5">
+              <span className={`badge ${statusCfg.bg} ${statusCfg.color}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot}`} />
                 {statusCfg.label}
               </span>
-              <span className="text-sm text-gray-500">{markCfg.label} &middot; Class {selected.international_class}</span>
+              <span className="text-sm text-gray-400">{markCfg.label} &middot; Class {selected.international_class}</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -313,31 +315,31 @@ export function TrademarkApplication() {
               <>
                 <button
                   onClick={() => { setIsEditing(false); setEditFields({}); }}
-                  className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="btn-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveDetail}
                   disabled={saving}
-                  className="px-4 py-2 text-sm text-white bg-shield-600 rounded-lg hover:bg-shield-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-amber-600 to-orange-500 rounded-xl hover:from-amber-700 hover:to-orange-600 shadow-sm shadow-amber-200 transition-all duration-200 disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Save
+                  Save Changes
                 </button>
               </>
             ) : (
               <>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="px-4 py-2 text-sm text-shield-600 border border-shield-200 rounded-lg hover:bg-shield-50 transition-colors flex items-center gap-2"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 transition-all duration-200"
                 >
                   <Edit3 className="w-4 h-4" />
                   Edit
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all duration-200"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -347,28 +349,34 @@ export function TrademarkApplication() {
         </div>
 
         {/* Completion bar */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Application Completeness</span>
-            <span className="text-sm font-semibold text-shield-600">{completePct}%</span>
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-gray-700">Application Completeness</span>
+            <span className="text-sm font-bold text-amber-600">{completePct}%</span>
           </div>
-          <div className="w-full bg-gray-100 rounded-full h-2">
+          <div className="w-full bg-gray-100 rounded-full h-2.5">
             <div
-              className="bg-shield-600 h-2 rounded-full transition-all"
+              className="bg-gradient-to-r from-amber-500 to-orange-500 h-2.5 rounded-full transition-all duration-500"
               style={{ width: `${completePct}%` }}
             />
           </div>
           {completion.missingFields.length > 0 && (
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-gray-400 mt-2">
               Missing: {completion.missingFields.join(', ')}
             </p>
           )}
         </div>
 
-        {/* Mark details card */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h3 className="text-lg font-semibold text-shield-800">Mark Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Card sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Mark details card */}
+          <div className="card p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-50 rounded-xl">
+                <MarkIcon className="w-5 h-5 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Mark Details</h3>
+            </div>
             <FieldGroup label="Mark Text">
               {isEditing ? (
                 <input
@@ -377,7 +385,7 @@ export function TrademarkApplication() {
                   onChange={e => setEditValue('mark_text', e.target.value)}
                 />
               ) : (
-                <p className="field-value text-lg font-semibold">{selected.mark_text || '-'}</p>
+                <p className="text-xl font-bold text-gray-900">{selected.mark_text || '-'}</p>
               )}
             </FieldGroup>
             <FieldGroup label="Mark Type">
@@ -393,12 +401,12 @@ export function TrademarkApplication() {
                 </select>
               ) : (
                 <div className="flex items-center gap-2">
-                  <MarkIcon className="w-4 h-4 text-gray-500" />
+                  <MarkIcon className="w-4 h-4 text-amber-500" />
                   <span className="field-value">{markCfg.label}</span>
                 </div>
               )}
             </FieldGroup>
-            <FieldGroup label="Description" className="md:col-span-2">
+            <FieldGroup label="Description">
               {isEditing ? (
                 <textarea
                   className="field-input min-h-[80px]"
@@ -406,23 +414,21 @@ export function TrademarkApplication() {
                   onChange={e => setEditValue('mark_description', e.target.value)}
                 />
               ) : (
-                <p className="field-value">{selected.mark_description || 'No description'}</p>
+                <p className="field-value text-gray-500">{selected.mark_description || 'No description'}</p>
               )}
             </FieldGroup>
           </div>
-        </div>
 
-        {/* Classification card */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h3 className="text-lg font-semibold text-shield-800">Nice Classification</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Classification card */}
+          <div className="card p-6 space-y-5">
+            <h3 className="text-lg font-bold text-gray-900">Nice Classification</h3>
             <FieldGroup label="International Class">
               {isEditing ? (
                 <div className="space-y-2">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
-                      className="field-input pl-9"
+                      className="field-input pl-10"
                       placeholder="Search classes..."
                       value={classSearch}
                       onChange={e => setClassSearch(e.target.value)}
@@ -443,9 +449,11 @@ export function TrademarkApplication() {
                 </div>
               ) : (
                 <div>
-                  <p className="text-2xl font-bold text-shield-600">Class {selected.international_class}</p>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-xl border border-amber-200">
+                    <span className="text-2xl font-bold text-amber-600">Class {selected.international_class}</span>
+                  </div>
                   {classifications.find(c => c.class_number === selected.international_class) && (
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-gray-500 mt-2">
                       {classifications.find(c => c.class_number === selected.international_class)!.class_heading}
                     </p>
                   )}
@@ -460,87 +468,92 @@ export function TrademarkApplication() {
                   onChange={e => setEditValue('goods_services_description', e.target.value)}
                 />
               ) : (
-                <p className="field-value">{selected.goods_services_description || 'No description'}</p>
+                <p className="field-value text-gray-500">{selected.goods_services_description || 'No description'}</p>
               )}
             </FieldGroup>
           </div>
-        </div>
 
-        {/* Filing basis card */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h3 className="text-lg font-semibold text-shield-800">Filing Basis</h3>
-          {isEditing ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {FILING_BASIS_OPTIONS.map(opt => {
-                const isSelected = (getEditValue('filing_basis', selected.filing_basis) as string) === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() => setEditValue('filing_basis', opt.value)}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${
-                      isSelected
-                        ? 'border-shield-600 bg-shield-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <p className={`text-sm font-medium ${isSelected ? 'text-shield-800' : 'text-gray-700'}`}>
-                      {opt.label}
+          {/* Filing basis card */}
+          <div className="card p-6 space-y-5">
+            <h3 className="text-lg font-bold text-gray-900">Filing Basis</h3>
+            {isEditing ? (
+              <div className="grid grid-cols-1 gap-3">
+                {FILING_BASIS_OPTIONS.map(opt => {
+                  const isSelected = (getEditValue('filing_basis', selected.filing_basis) as string) === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => setEditValue('filing_basis', opt.value)}
+                      className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all duration-200 ${
+                        isSelected
+                          ? 'border-amber-500 bg-amber-50 shadow-sm shadow-amber-100'
+                          : 'border-gray-100 hover:border-gray-200 bg-white'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        isSelected ? 'border-amber-500' : 'border-gray-300'
+                      }`}>
+                        {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />}
+                      </div>
+                      <div>
+                        <p className={`text-sm font-semibold ${isSelected ? 'text-amber-800' : 'text-gray-700'}`}>
+                          {opt.label}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">{opt.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                <p className="font-semibold text-amber-800">
+                  {FILING_BASIS_OPTIONS.find(o => o.value === selected.filing_basis)?.label}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {FILING_BASIS_OPTIONS.find(o => o.value === selected.filing_basis)?.description}
+                </p>
+              </div>
+            )}
+
+            {/* First use dates */}
+            {(selected.filing_basis === 'use_in_commerce' || (isEditing && getEditValue('filing_basis', selected.filing_basis) === 'use_in_commerce')) && (
+              <div className="grid grid-cols-1 gap-4 pt-3">
+                <FieldGroup label="First Use Date">
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      className="field-input"
+                      value={getEditValue('first_use_date', selected.first_use_date ?? '') as string}
+                      onChange={e => setEditValue('first_use_date', e.target.value)}
+                    />
+                  ) : (
+                    <p className="field-value">
+                      {selected.first_use_date ? new Date(selected.first_use_date).toLocaleDateString() : '-'}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">{opt.description}</p>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="p-4 bg-shield-50 rounded-xl border border-shield-200">
-              <p className="font-medium text-shield-800">
-                {FILING_BASIS_OPTIONS.find(o => o.value === selected.filing_basis)?.label}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">
-                {FILING_BASIS_OPTIONS.find(o => o.value === selected.filing_basis)?.description}
-              </p>
-            </div>
-          )}
+                  )}
+                </FieldGroup>
+                <FieldGroup label="First Use in Commerce Date">
+                  {isEditing ? (
+                    <input
+                      type="date"
+                      className="field-input"
+                      value={getEditValue('first_use_commerce_date', selected.first_use_commerce_date ?? '') as string}
+                      onChange={e => setEditValue('first_use_commerce_date', e.target.value)}
+                    />
+                  ) : (
+                    <p className="field-value">
+                      {selected.first_use_commerce_date ? new Date(selected.first_use_commerce_date).toLocaleDateString() : '-'}
+                    </p>
+                  )}
+                </FieldGroup>
+              </div>
+            )}
+          </div>
 
-          {/* First use dates */}
-          {(selected.filing_basis === 'use_in_commerce' || (isEditing && getEditValue('filing_basis', selected.filing_basis) === 'use_in_commerce')) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-3">
-              <FieldGroup label="First Use Date">
-                {isEditing ? (
-                  <input
-                    type="date"
-                    className="field-input"
-                    value={getEditValue('first_use_date', selected.first_use_date ?? '') as string}
-                    onChange={e => setEditValue('first_use_date', e.target.value)}
-                  />
-                ) : (
-                  <p className="field-value">
-                    {selected.first_use_date ? new Date(selected.first_use_date).toLocaleDateString() : '-'}
-                  </p>
-                )}
-              </FieldGroup>
-              <FieldGroup label="First Use in Commerce Date">
-                {isEditing ? (
-                  <input
-                    type="date"
-                    className="field-input"
-                    value={getEditValue('first_use_commerce_date', selected.first_use_commerce_date ?? '') as string}
-                    onChange={e => setEditValue('first_use_commerce_date', e.target.value)}
-                  />
-                ) : (
-                  <p className="field-value">
-                    {selected.first_use_commerce_date ? new Date(selected.first_use_commerce_date).toLocaleDateString() : '-'}
-                  </p>
-                )}
-              </FieldGroup>
-            </div>
-          )}
-        </div>
-
-        {/* Owner info card */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h3 className="text-lg font-semibold text-shield-800">Owner Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Owner info card */}
+          <div className="card p-6 space-y-5">
+            <h3 className="text-lg font-bold text-gray-900">Owner Information</h3>
             <FieldGroup label="Owner Name">
               {isEditing ? (
                 <input
@@ -549,7 +562,7 @@ export function TrademarkApplication() {
                   onChange={e => setEditValue('owner_name', e.target.value)}
                 />
               ) : (
-                <p className="field-value">{selected.owner_name}</p>
+                <p className="field-value font-medium">{selected.owner_name}</p>
               )}
             </FieldGroup>
             <FieldGroup label="Owner Type">
@@ -581,45 +594,65 @@ export function TrademarkApplication() {
           </div>
         </div>
 
-        {/* Status tracking */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h3 className="text-lg font-semibold text-shield-800">Status Tracking</h3>
-          <div className="flex flex-wrap gap-2">
-            {(['draft', 'pending_review', 'filed', 'published', 'registered'] as TrademarkStatus[]).map(status => {
+        {/* Status stepper */}
+        <div className="card p-6 space-y-5">
+          <h3 className="text-lg font-bold text-gray-900">Status Tracking</h3>
+          <div className="flex items-center gap-0">
+            {STATUS_FLOW.map((status, idx) => {
               const cfg = STATUS_CONFIG[status];
               const Icon = cfg.icon;
               const isCurrent = selected.status === status;
+              const isPast = currentStepIdx >= 0 && idx < currentStepIdx;
+              const isLast = idx === STATUS_FLOW.length - 1;
               return (
-                <button
-                  key={status}
-                  onClick={() => !isCurrent && handleStatusChange(status)}
-                  disabled={saving || isCurrent}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    isCurrent
-                      ? 'bg-shield-600 text-white'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {cfg.label}
-                </button>
+                <div key={status} className="flex items-center flex-1">
+                  <button
+                    onClick={() => !isCurrent && handleStatusChange(status)}
+                    disabled={saving || isCurrent}
+                    className={`flex flex-col items-center gap-2 flex-1 py-3 rounded-xl transition-all duration-200 ${
+                      isCurrent
+                        ? 'bg-amber-50'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
+                      isCurrent
+                        ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-amber-200'
+                        : isPast
+                          ? 'bg-amber-100 text-amber-600'
+                          : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className={`text-xs font-medium text-center leading-tight ${
+                      isCurrent ? 'text-amber-700' : isPast ? 'text-amber-500' : 'text-gray-400'
+                    }`}>
+                      {cfg.label}
+                    </span>
+                  </button>
+                  {!isLast && (
+                    <div className={`w-8 h-0.5 flex-shrink-0 rounded ${
+                      isPast ? 'bg-amber-300' : 'bg-gray-200'
+                    }`} />
+                  )}
+                </div>
               );
             })}
           </div>
           {selected.serial_number && (
-            <div className="p-4 bg-shield-50 rounded-lg border border-shield-200">
-              <p className="text-sm text-shield-800">
-                <span className="font-semibold">Serial #:</span> {selected.serial_number}
+            <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+              <p className="text-sm text-amber-800 font-medium">
+                Serial #{selected.serial_number}
               </p>
             </div>
           )}
           {selected.registration_number && (
-            <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-              <p className="text-sm text-emerald-800">
-                <span className="font-semibold">Registration #:</span> {selected.registration_number}
+            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+              <p className="text-sm text-emerald-800 font-medium">
+                Registration #{selected.registration_number}
               </p>
               {selected.registration_date && (
-                <p className="text-sm text-emerald-700 mt-1">
+                <p className="text-sm text-emerald-600 mt-1">
                   Registered on {new Date(selected.registration_date).toLocaleDateString()}
                 </p>
               )}
@@ -631,24 +664,24 @@ export function TrademarkApplication() {
         {showDeleteConfirm && (
           <Modal onClose={() => setShowDeleteConfirm(false)}>
             <div className="text-center space-y-4">
-              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+              <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto">
                 <Trash2 className="w-6 h-6 text-red-500" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Delete Application</h3>
+              <h3 className="text-lg font-bold text-gray-900">Delete Application</h3>
               <p className="text-gray-500">
                 Are you sure you want to delete "{selected.mark_text || 'this application'}"? This cannot be undone.
               </p>
               <div className="flex gap-3 justify-center pt-2">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="btn-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDelete}
                   disabled={saving}
-                  className="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-all disabled:opacity-50"
                 >
                   {saving ? 'Deleting...' : 'Delete'}
                 </button>
@@ -662,68 +695,73 @@ export function TrademarkApplication() {
 
   // --- List View ---
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-shield-800">Trademark Applications</h2>
-          <p className="text-sm text-gray-500 mt-1">{applications.length} application{applications.length !== 1 ? 's' : ''}</p>
+          <h2 className="text-2xl font-bold text-gray-900">Trademark Applications</h2>
+          <p className="text-sm text-gray-400 mt-1">{applications.length} application{applications.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-shield-600 text-white text-sm font-medium rounded-lg hover:bg-shield-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-amber-600 to-orange-500 rounded-xl hover:from-amber-700 hover:to-orange-600 shadow-sm shadow-amber-200 transition-all duration-200"
         >
           <Plus className="w-4 h-4" />
           New Application
         </button>
       </div>
 
-      {/* Application cards */}
+      {/* Application cards - GRID layout */}
       {applications.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <Shield className="w-14 h-14 mx-auto mb-4 text-gray-200" />
-          <h3 className="text-lg font-medium text-gray-700 mb-2">No applications yet</h3>
-          <p className="text-gray-500 mb-6">Create your first trademark application to protect your brand.</p>
+        <div className="card p-16 text-center">
+          <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <Shield className="w-8 h-8 text-amber-300" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">No applications yet</h3>
+          <p className="text-gray-400 mb-8 max-w-sm mx-auto">Create your first trademark application to protect your brand.</p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-shield-600 text-white rounded-lg hover:bg-shield-700 transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-amber-600 to-orange-500 rounded-xl hover:from-amber-700 hover:to-orange-600 shadow-sm shadow-amber-200 transition-all duration-200"
           >
             <Plus className="w-4 h-4" />
             Create Application
           </button>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {applications.map(app => {
             const cfg = STATUS_CONFIG[app.status];
-            const StatusIcon = cfg.icon;
             const markCfg = MARK_TYPE_CONFIG[app.mark_type];
-            const MarkIcon = markCfg.icon;
+            const MIcon = markCfg.icon;
             return (
               <button
                 key={app.id}
                 onClick={() => openDetail(app)}
-                className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:shadow-md hover:border-shield-200 transition-all group"
+                className="card p-5 text-left hover:shadow-md hover:border-amber-200 transition-all duration-200 group"
               >
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-shield-50 rounded-xl group-hover:bg-shield-100 transition-colors">
-                    <MarkIcon className="w-5 h-5 text-shield-600" />
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-amber-50 rounded-xl group-hover:bg-amber-100 transition-colors duration-200">
+                    <MIcon className="w-5 h-5 text-amber-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-900 truncate">
-                      {app.mark_text || 'Design Mark'}
-                    </h4>
-                    <p className="text-sm text-gray-500 mt-0.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <h4 className="font-semibold text-gray-900 truncate">
+                        {app.mark_text || 'Design Mark'}
+                      </h4>
+                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-amber-500 transition-colors flex-shrink-0 mt-0.5" />
+                    </div>
+                    <p className="text-sm text-gray-400 mt-1">
                       {markCfg.label} &middot; Class {app.international_class}
                     </p>
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className={`badge ${cfg.bg} ${cfg.color}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                        {cfg.label}
+                      </span>
+                    </div>
                   </div>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>
-                    <StatusIcon className="w-3 h-3" />
-                    {cfg.label}
-                  </span>
-                  <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-shield-600 transition-colors" />
                 </div>
               </button>
             );
@@ -734,13 +772,17 @@ export function TrademarkApplication() {
       {/* Create modal */}
       {showCreateModal && (
         <Modal onClose={() => setShowCreateModal(false)}>
-          <h3 className="text-lg font-semibold text-shield-800 mb-6">New Trademark Application</h3>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2.5 bg-amber-50 rounded-xl">
+              <Tag className="w-5 h-5 text-amber-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">New Trademark Application</h3>
+          </div>
           <div className="space-y-5">
-            {/* Mark type selector */}
+            {/* Mark type selector - large icon cards */}
             <FieldGroup label="Mark Type">
-              <div className="grid grid-cols-3 gap-2">
-                {(['word_mark', 'design_mark', 'combined_mark'] as MarkType[]).map(mt => {
-                  const cfg = MARK_TYPE_CONFIG[mt];
+              <div className="grid grid-cols-3 gap-3">
+                {(Object.entries(MARK_TYPE_CONFIG) as [MarkType, typeof MARK_TYPE_CONFIG[MarkType]][]).slice(0, 3).map(([mt, cfg]) => {
                   const Icon = cfg.icon;
                   const isActive = formData.markType === mt;
                   return (
@@ -748,14 +790,42 @@ export function TrademarkApplication() {
                       key={mt}
                       type="button"
                       onClick={() => setFormData(f => ({ ...f, markType: mt }))}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 ${
                         isActive
-                          ? 'border-shield-600 bg-shield-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-amber-500 bg-amber-50 shadow-sm shadow-amber-100'
+                          : 'border-gray-100 hover:border-gray-200 bg-white'
                       }`}
                     >
-                      <Icon className={`w-5 h-5 ${isActive ? 'text-shield-600' : 'text-gray-400'}`} />
-                      <span className={`text-xs font-medium ${isActive ? 'text-shield-700' : 'text-gray-600'}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        isActive ? 'bg-amber-100' : 'bg-gray-100'
+                      }`}>
+                        <Icon className={`w-5 h-5 ${isActive ? 'text-amber-600' : 'text-gray-400'}`} />
+                      </div>
+                      <span className={`text-xs font-semibold ${isActive ? 'text-amber-700' : 'text-gray-500'}`}>
+                        {cfg.label}
+                      </span>
+                      <span className="text-[10px] text-gray-400 text-center leading-tight">{cfg.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                {(Object.entries(MARK_TYPE_CONFIG) as [MarkType, typeof MARK_TYPE_CONFIG[MarkType]][]).slice(3).map(([mt, cfg]) => {
+                  const Icon = cfg.icon;
+                  const isActive = formData.markType === mt;
+                  return (
+                    <button
+                      key={mt}
+                      type="button"
+                      onClick={() => setFormData(f => ({ ...f, markType: mt }))}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-200 ${
+                        isActive
+                          ? 'border-amber-500 bg-amber-50 shadow-sm shadow-amber-100'
+                          : 'border-gray-100 hover:border-gray-200 bg-white'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 ${isActive ? 'text-amber-600' : 'text-gray-400'}`} />
+                      <span className={`text-xs font-semibold ${isActive ? 'text-amber-700' : 'text-gray-500'}`}>
                         {cfg.label}
                       </span>
                     </button>
@@ -782,30 +852,42 @@ export function TrademarkApplication() {
               />
             </FieldGroup>
 
-            {/* Nice classification */}
+            {/* Nice classification with search */}
             <FieldGroup label="International Class (Nice Classification)">
               <div className="space-y-2">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
-                    className="field-input pl-9"
+                    className="field-input pl-10"
                     placeholder="Search classes..."
                     value={classSearch}
                     onChange={e => setClassSearch(e.target.value)}
                   />
                 </div>
-                <select
-                  className="field-input"
-                  size={4}
-                  value={formData.internationalClass}
-                  onChange={e => setFormData(f => ({ ...f, internationalClass: parseInt(e.target.value) }))}
-                >
-                  {filteredClasses.map(c => (
-                    <option key={c.class_number} value={c.class_number}>
-                      Class {c.class_number} - {c.class_heading}
-                    </option>
-                  ))}
-                </select>
+                <div className="max-h-36 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50">
+                  {filteredClasses.map(c => {
+                    const isActive = formData.internationalClass === c.class_number;
+                    return (
+                      <button
+                        key={c.class_number}
+                        type="button"
+                        onClick={() => setFormData(f => ({ ...f, internationalClass: c.class_number }))}
+                        className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 last:border-0 transition-colors ${
+                          isActive
+                            ? 'bg-amber-50 text-amber-800 font-medium'
+                            : 'hover:bg-white text-gray-600'
+                        }`}
+                      >
+                        <span className={`inline-flex items-center justify-center w-8 h-5 rounded text-xs font-bold mr-2 ${
+                          isActive ? 'bg-amber-200 text-amber-800' : 'bg-gray-200 text-gray-500'
+                        }`}>
+                          {c.class_number}
+                        </span>
+                        {c.class_heading}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </FieldGroup>
 
@@ -818,17 +900,35 @@ export function TrademarkApplication() {
               />
             </FieldGroup>
 
-            {/* Filing basis */}
+            {/* Filing basis - visual radio cards */}
             <FieldGroup label="Filing Basis">
-              <select
-                className="field-input"
-                value={formData.filingBasis}
-                onChange={e => setFormData(f => ({ ...f, filingBasis: e.target.value as FilingBasis }))}
-              >
-                {FILING_BASIS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <div className="grid grid-cols-1 gap-2">
+                {FILING_BASIS_OPTIONS.map(opt => {
+                  const isActive = formData.filingBasis === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setFormData(f => ({ ...f, filingBasis: opt.value }))}
+                      className={`flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all duration-200 ${
+                        isActive
+                          ? 'border-amber-500 bg-amber-50'
+                          : 'border-gray-100 hover:border-gray-200'
+                      }`}
+                    >
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        isActive ? 'border-amber-500' : 'border-gray-300'
+                      }`}>
+                        {isActive && <div className="w-2 h-2 rounded-full bg-amber-500" />}
+                      </div>
+                      <div>
+                        <p className={`text-sm font-semibold ${isActive ? 'text-amber-800' : 'text-gray-600'}`}>{opt.label}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{opt.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </FieldGroup>
 
             <div className="grid grid-cols-2 gap-4">
@@ -856,17 +956,17 @@ export function TrademarkApplication() {
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="btn-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreate}
                 disabled={saving || !formData.markText.trim() || !formData.ownerName.trim()}
-                className="flex items-center gap-2 px-5 py-2 text-sm text-white bg-shield-600 rounded-lg hover:bg-shield-700 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-amber-600 to-orange-500 rounded-xl hover:from-amber-700 hover:to-orange-600 shadow-sm shadow-amber-200 transition-all duration-200 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Create
+                Create Application
               </button>
             </div>
           </div>
@@ -881,11 +981,11 @@ export function TrademarkApplication() {
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-7">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute top-5 right-5 p-1.5 text-gray-300 hover:text-gray-500 rounded-lg hover:bg-gray-100 transition-all"
         >
           <X className="w-5 h-5" />
         </button>
@@ -898,7 +998,7 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
 function FieldGroup({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={className}>
-      <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">{label}</label>
+      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{label}</label>
       {children}
     </div>
   );
@@ -906,10 +1006,10 @@ function FieldGroup({ label, children, className = '' }: { label: string; childr
 
 function ErrorBanner({ message, onDismiss }: { message: string; onDismiss: () => void }) {
   return (
-    <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-      <p className="flex-1 text-sm text-red-700">{message}</p>
-      <button onClick={onDismiss} className="text-red-400 hover:text-red-600">
+    <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start gap-3">
+      <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+      <p className="flex-1 text-sm text-red-600">{message}</p>
+      <button onClick={onDismiss} className="text-red-300 hover:text-red-500 transition-colors">
         <X className="w-4 h-4" />
       </button>
     </div>

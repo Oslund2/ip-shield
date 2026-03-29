@@ -452,8 +452,10 @@ export function PatentApplication() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-shield-600 mx-auto mb-4" />
-          <p className="text-slate-500 text-sm">Loading patent applications...</p>
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center mx-auto mb-4">
+            <Loader2 className="w-7 h-7 animate-spin text-blue-600" />
+          </div>
+          <p className="text-gray-500 text-sm font-medium">Loading patent applications...</p>
         </div>
       </div>
     );
@@ -464,15 +466,17 @@ export function PatentApplication() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-shield-800 flex items-center gap-3">
-            <Shield className="w-7 h-7 text-shield-600" />
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-200">
+              <Shield className="w-5 h-5 text-white" />
+            </div>
             Patent Applications
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Manage and generate patent documentation</p>
+          <p className="text-gray-500 text-sm mt-1.5 ml-[52px]">Manage and generate patent documentation</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-shield-600 text-white text-sm font-medium rounded-lg hover:bg-shield-700 transition-colors shadow-sm"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md shadow-blue-200 hover:shadow-lg hover:shadow-blue-200"
         >
           <Plus className="w-4 h-4" />
           New Application
@@ -481,13 +485,15 @@ export function PatentApplication() {
 
       {/* Error Banner */}
       {error && (
-        <div className="mb-6 bg-white border border-red-200 rounded-lg p-4 flex items-start gap-3 shadow-sm">
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-red-800">Error</p>
+        <div className="mb-6 bg-white border border-red-200 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
+          <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
+            <AlertCircle className="w-4 h-4 text-red-500" />
+          </div>
+          <div className="flex-1 pt-1">
+            <p className="text-sm font-semibold text-red-800">Something went wrong</p>
             <p className="text-sm text-red-600 mt-0.5">{error}</p>
           </div>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 transition-colors">
+          <button onClick={() => setError(null)} className="text-red-300 hover:text-red-500 transition-colors p-1">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -496,18 +502,20 @@ export function PatentApplication() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar - Applications List */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Applications</h2>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">Applications</h2>
             </div>
-            <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
+            <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
               {applications.length === 0 ? (
                 <div className="p-8 text-center">
-                  <FileText className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-                  <p className="text-slate-500 text-sm">No applications yet</p>
+                  <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                    <FileText className="w-6 h-6 text-gray-300" />
+                  </div>
+                  <p className="text-gray-500 text-sm">No applications yet</p>
                   <button
                     onClick={() => setShowCreateModal(true)}
-                    className="mt-3 text-shield-600 hover:text-shield-700 text-sm font-medium transition-colors"
+                    className="mt-3 text-blue-600 hover:text-blue-700 text-sm font-semibold transition-colors"
                   >
                     Create your first application
                   </button>
@@ -517,19 +525,20 @@ export function PatentApplication() {
                   <button
                     key={app.id}
                     onClick={() => loadApplication(app.id)}
-                    className={`w-full px-4 py-3.5 text-left transition-colors ${
+                    className={`w-full px-4 py-4 text-left transition-all duration-150 ${
                       selectedApp?.id === app.id
-                        ? 'bg-shield-50 border-l-3 border-l-shield-600'
-                        : 'hover:bg-slate-50'
+                        ? 'bg-blue-50/60 border-l-[3px] border-l-blue-600'
+                        : 'hover:bg-slate-50 border-l-[3px] border-l-transparent'
                     }`}
                   >
-                    <p className="text-sm font-medium text-slate-800 truncate">{app.title}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusColor(app.status)}`}>
+                    <p className={`text-sm font-medium truncate ${selectedApp?.id === app.id ? 'text-blue-900' : 'text-gray-800'}`}>{app.title}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${getStatusColor(app.status)}`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
                         {getStatusLabel(app.status)}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1.5">
                       {new Date(app.updated_at).toLocaleDateString()}
                     </p>
                   </button>
@@ -542,20 +551,54 @@ export function PatentApplication() {
         {/* Main Content */}
         <div className="lg:col-span-3">
           {selectedApp ? (
-            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-              {/* Tab Navigation */}
-              <div className="border-b border-slate-200 bg-white">
-                <div className="flex overflow-x-auto scrollbar-hide">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              {/* Top bar with title + actions */}
+              <div className="px-6 py-4 border-b border-gray-100 bg-white flex items-center justify-between">
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-gray-900 truncate">{selectedApp.title}</h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${getStatusColor(selectedApp.status)}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                      {getStatusLabel(selectedApp.status)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleAIGeneration}
+                    disabled={aiGenerating}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 transition-all shadow-sm"
+                  >
+                    {aiGenerating ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
+                    ) : (
+                      <><Sparkles className="w-4 h-4" /> Generate</>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleExportPDF}
+                    disabled={exporting}
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:shadow-sm disabled:opacity-50 transition-all"
+                  >
+                    {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    Export
+                  </button>
+                </div>
+              </div>
+
+              {/* Tab Navigation - horizontal pills */}
+              <div className="border-b border-gray-100 bg-slate-50/50 px-4 py-2.5">
+                <div className="flex gap-1 overflow-x-auto scrollbar-hide">
                   {tabs.map(tab => {
                     const Icon = tab.icon;
                     return (
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                        className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium whitespace-nowrap rounded-lg transition-all duration-150 ${
                           activeTab === tab.id
-                            ? 'border-shield-600 text-shield-600'
-                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                            ? 'bg-white text-blue-700 shadow-sm border border-gray-200/80'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'
                         }`}
                       >
                         <Icon className="w-3.5 h-3.5" />
@@ -643,23 +686,32 @@ export function PatentApplication() {
                 )}
 
                 {activeTab === 'prior-art' && (
-                  <div className="text-center py-12">
-                    <Scroll className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="text-slate-500">Prior Art analysis coming soon</p>
+                  <div className="text-center py-16">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                      <Scroll className="w-7 h-7 text-gray-300" />
+                    </div>
+                    <p className="text-gray-500 font-medium">Prior Art analysis coming soon</p>
+                    <p className="text-gray-400 text-sm mt-1">We're working on bringing you AI-powered prior art search</p>
                   </div>
                 )}
 
                 {activeTab === 'analysis' && (
-                  <div className="text-center py-12">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="text-slate-500">AI Analysis coming soon</p>
+                  <div className="text-center py-16">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                      <BarChart3 className="w-7 h-7 text-gray-300" />
+                    </div>
+                    <p className="text-gray-500 font-medium">AI Analysis coming soon</p>
+                    <p className="text-gray-400 text-sm mt-1">Deep patent strength and patentability analysis</p>
                   </div>
                 )}
 
                 {activeTab === 'filing' && (
-                  <div className="text-center py-12">
-                    <ClipboardCheck className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p className="text-slate-500">Filing tools coming soon</p>
+                  <div className="text-center py-16">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                      <ClipboardCheck className="w-7 h-7 text-gray-300" />
+                    </div>
+                    <p className="text-gray-500 font-medium">Filing tools coming soon</p>
+                    <p className="text-gray-400 text-sm mt-1">Automated USPTO filing preparation</p>
                   </div>
                 )}
 
@@ -677,13 +729,15 @@ export function PatentApplication() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-lg border border-slate-200 shadow-sm p-12 text-center">
-              <Shield className="w-14 h-14 mx-auto mb-4 text-slate-300" />
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">No Application Selected</h3>
-              <p className="text-slate-500 text-sm mb-6">Select an application from the list or create a new one to get started.</p>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-16 text-center">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center mx-auto mb-5">
+                <Shield className="w-9 h-9 text-blue-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">No Application Selected</h3>
+              <p className="text-gray-500 text-sm mb-8 max-w-sm mx-auto">Select an application from the list or create a new one to get started.</p>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-shield-600 text-white text-sm font-medium rounded-lg hover:bg-shield-700 transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md shadow-blue-200"
               >
                 <Plus className="w-4 h-4" />
                 Create Application
@@ -695,72 +749,75 @@ export function PatentApplication() {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-800">New Patent Application</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowCreateModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">New Patent Application</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Fill in the details to get started</p>
+              </div>
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 hover:bg-gray-100 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Title *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Title *</label>
                 <input
                   type="text"
                   value={createTitle}
                   onChange={e => setCreateTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-shield-500 focus:border-shield-500 outline-none transition-shadow"
+                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all"
                   placeholder="Enter patent title"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Invention Description</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Invention Description</label>
                 <textarea
                   value={createDescription}
                   onChange={e => setCreateDescription(e.target.value)}
                   rows={3}
-                  className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-shield-500 focus:border-shield-500 outline-none transition-shadow"
+                  className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all resize-none"
                   placeholder="Describe what your invention does and how it works..."
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Technical Field</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Technical Field</label>
                   <input
                     type="text"
                     value={createTechnicalField}
                     onChange={e => setCreateTechnicalField(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-shield-500 focus:border-shield-500 outline-none transition-shadow"
+                    className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all"
                     placeholder="e.g., Data processing"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Problem Solved</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Problem Solved</label>
                   <input
                     type="text"
                     value={createProblemSolved}
                     onChange={e => setCreateProblemSolved(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-shield-500 focus:border-shield-500 outline-none transition-shadow"
+                    className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all"
                     placeholder="What problem does it solve?"
                   />
                 </div>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-xl flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-gray-100 bg-slate-50/50 rounded-b-2xl flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 transition-colors"
+                className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateApplication}
                 disabled={saving || !createTitle.trim()}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-shield-600 text-white text-sm font-medium rounded-lg hover:bg-shield-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 transition-all shadow-sm"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                Create
+                Create Application
               </button>
             </div>
           </div>
@@ -769,30 +826,35 @@ export function PatentApplication() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedApp && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-800">Delete Application</h3>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-red-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Application</h3>
+              </div>
             </div>
             <div className="p-6">
-              <p className="text-sm text-slate-600">
-                Are you sure you want to delete <span className="font-semibold text-slate-800">"{selectedApp.title}"</span>? This will permanently remove all claims, drawings, and specification data. This action cannot be undone.
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Are you sure you want to delete <span className="font-semibold text-gray-900">"{selectedApp.title}"</span>? This will permanently remove all claims, drawings, and specification data. This action cannot be undone.
               </p>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-xl flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-gray-100 bg-slate-50/50 rounded-b-2xl flex justify-end gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 transition-colors"
+                className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteApplication}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-50 transition-all shadow-sm"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                Delete
+                Delete Permanently
               </button>
             </div>
           </div>
@@ -801,19 +863,22 @@ export function PatentApplication() {
 
       {/* AI Generation Progress Modal */}
       {showAiModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
-            <Sparkles className="w-10 h-10 text-shield-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">Generating Patent Application</h3>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center mx-auto mb-5">
+              <Sparkles className="w-7 h-7 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Generating Patent Application</h3>
+            <p className="text-sm text-gray-500 mb-6">AI is crafting your complete patent documentation</p>
             {aiProgress && (
-              <div className="mt-4 space-y-3">
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+              <div className="space-y-3">
+                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
                   <div
-                    className="h-full bg-shield-600 rounded-full transition-all duration-500"
+                    className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-500"
                     style={{ width: `${(aiProgress.step / aiProgress.totalSteps) * 100}%` }}
                   />
                 </div>
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-gray-600 font-medium">
                   Step {aiProgress.step} of {aiProgress.totalSteps}: {aiProgress.currentStep}
                 </p>
               </div>
@@ -821,7 +886,7 @@ export function PatentApplication() {
             {!aiGenerating && (
               <button
                 onClick={() => { setShowAiModal(false); setAiProgress(null); }}
-                className="mt-4 px-4 py-2 text-sm text-slate-600 hover:text-slate-800 transition-colors"
+                className="mt-6 px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
               >
                 Close
               </button>
