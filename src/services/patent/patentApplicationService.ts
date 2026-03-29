@@ -205,56 +205,7 @@ export async function getPatentApplications(projectId: string, userId: string): 
 export async function getPatentApplication(applicationId: string, userId: string): Promise<PatentApplicationWithDetails | null> {
   const { data: application, error: appError } = await (supabase as any)
     .from('patent_applications')
-    .select(`
-      id,
-      project_id,
-      user_id,
-      title,
-      filing_type,
-      status,
-      inventor_name,
-      inventor_citizenship,
-      specification,
-      abstract,
-      invention_description,
-      technical_field,
-      problem_solved,
-      key_features,
-      field_of_invention,
-      background_art,
-      summary_invention,
-      detailed_description,
-      prior_art_patents,
-      prior_art_literature,
-      metadata,
-      version,
-      created_at,
-      updated_at,
-      prior_art_search_status,
-      prior_art_search_completed_at,
-      novelty_score,
-      novelty_analysis_id,
-      differentiation_analysis,
-      claims_generation_status,
-      claims_generation_completed_at,
-      drawings_generation_status,
-      drawings_generation_completed_at,
-      specification_generation_status,
-      specification_generation_completed_at,
-      full_application_status,
-      full_application_completed_at,
-      cpc_classifications,
-      entity_status,
-      inventors,
-      correspondence_address,
-      attorney_info,
-      government_interest,
-      foreign_priority_claims,
-      filing_checklist_status,
-      provisional_filing_date,
-      conversion_deadline,
-      estimated_filing_fee
-    `)
+    .select('*')
     .eq('id', applicationId)
     .eq('user_id', userId)
     .maybeSingle();
