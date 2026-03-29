@@ -81,18 +81,11 @@ export function LoginPage({ onToggleSignUp }: LoginPageProps) {
           </div>
 
           <button
-            onClick={async () => {
-              setError('');
-              setLoading(true);
-              const { error } = await signInAsGuest();
-              if (error) setError(error.message);
-              setLoading(false);
-            }}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-shield-600 to-indigo-600 text-white font-semibold py-4 px-4 rounded-xl hover:shadow-lg hover:shadow-shield-600/25 transition-all mb-4 text-lg disabled:opacity-50"
+            onClick={() => signInAsGuest()}
+            className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-shield-600 to-indigo-600 text-white font-semibold py-4 px-4 rounded-xl hover:shadow-lg hover:shadow-shield-600/25 transition-all mb-4 text-lg"
           >
             <Zap className="w-5 h-5" />
-            {loading ? 'Starting...' : 'Get Started — No Account Needed'}
+            Get Started — No Account Needed
           </button>
 
           <button
