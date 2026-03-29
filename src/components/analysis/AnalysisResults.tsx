@@ -5,7 +5,7 @@ import { useProject } from '../../contexts/ProjectContext';
 import type { ExtractedFeature } from '../../types';
 
 interface AnalysisResultsProps {
-  onNavigate: (view: 'patents' | 'copyrights' | 'trademarks') => void;
+  onNavigate: () => void;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -106,7 +106,7 @@ export function AnalysisResults({ onNavigate }: AnalysisResultsProps) {
       {/* Action cards */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <button
-          onClick={() => onNavigate('patents')}
+          onClick={onNavigate}
           className="flex flex-col items-center gap-3 p-6 bg-white border border-gray-200 rounded-xl hover:border-shield-500 hover:shadow-md transition-all group"
         >
           <div className="w-12 h-12 bg-shield-100 rounded-xl flex items-center justify-center group-hover:bg-shield-200 transition-colors">
@@ -120,7 +120,7 @@ export function AnalysisResults({ onNavigate }: AnalysisResultsProps) {
         </button>
 
         <button
-          onClick={() => onNavigate('copyrights')}
+          onClick={onNavigate}
           className="flex flex-col items-center gap-3 p-6 bg-white border border-gray-200 rounded-xl hover:border-shield-500 hover:shadow-md transition-all group"
         >
           <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:bg-purple-200 transition-colors">
@@ -134,7 +134,7 @@ export function AnalysisResults({ onNavigate }: AnalysisResultsProps) {
         </button>
 
         <button
-          onClick={() => onNavigate('trademarks')}
+          onClick={onNavigate}
           className="flex flex-col items-center gap-3 p-6 bg-white border border-gray-200 rounded-xl hover:border-shield-500 hover:shadow-md transition-all group"
         >
           <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center group-hover:bg-amber-200 transition-colors">

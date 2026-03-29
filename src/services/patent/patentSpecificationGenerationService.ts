@@ -1,0 +1,714 @@
+import { generateText } from '../ai/geminiService';
+
+// Inline prompt builders for patent specification sections
+// These replace the beestudio promptResolver dependency with self-contained prompt generation
+
+function buildFieldOfInventionPrompt(vars: {
+  title: string;
+  technicalField: string;
+  inventionDescription: string;
+  features: string;
+}): string {
+  return `You are a patent attorney drafting a Field of Invention section for a US patent application.
+
+INVENTION TITLE: ${vars.title}
+TECHNICAL FIELD: ${vars.technicalField}
+INVENTION DESCRIPTION: ${vars.inventionDescription}
+
+KEY FEATURES:
+${vars.features}
+
+Write a concise "Field of the Invention" section (1-2 paragraphs) that:
+1. Identifies the general technical field
+2. Narrows to the specific area of the invention
+3. Uses formal patent language ("The present invention relates to...")
+4. Does NOT include specific details of the invention itself
+
+Write ONLY the section text, no headings or labels.`;
+}
+
+function buildBackgroundPrompt(vars: {
+  inventionDescription: string;
+  problemSolved: string;
+  priorArt: string;
+  differentiationPoints: string;
+}): string {
+  return `You are a patent attorney drafting a Background of the Invention section for a US patent application.
+
+INVENTION DESCRIPTION: ${vars.inventionDescription}
+PROBLEM SOLVED: ${vars.problemSolved}
+
+PRIOR ART:
+${vars.priorArt}
+
+DIFFERENTIATION POINTS:
+${vars.differentiationPoints}
+
+Write a "Background of the Invention" section (3-5 paragraphs) that:
+1. Describes the current state of the art
+2. Identifies specific limitations and problems in existing solutions
+3. Explains why existing approaches are inadequate
+4. Sets up the need for the present invention WITHOUT describing it
+5. Uses formal patent language and avoids disparaging prior art
+
+Write ONLY the section text, no headings or labels.`;
+}
+
+function buildSummaryPrompt(vars: {
+  title: string;
+  features: string;
+  differentiationPoints: string;
+  inventionDescription: string;
+  problemSolved: string;
+}): string {
+  return `You are a patent attorney drafting a Summary of the Invention section for a US patent application.
+
+INVENTION TITLE: ${vars.title}
+INVENTION DESCRIPTION: ${vars.inventionDescription}
+PROBLEM SOLVED: ${vars.problemSolved}
+
+CORE FEATURES:
+${vars.features}
+
+ADVANTAGES OVER PRIOR ART:
+${vars.differentiationPoints}
+
+Write a "Summary of the Invention" section (3-5 paragraphs) that:
+1. Begins with "The present invention provides..." or similar
+2. Broadly describes the invention and its key aspects
+3. Highlights the technical advantages
+4. Mentions different embodiments if applicable
+5. Uses formal patent language
+
+Write ONLY the section text, no headings or labels.`;
+}
+
+function buildDetailedDescriptionPrompt(vars: {
+  sectionType: string;
+  title: string;
+  features: string;
+  inventionDescription: string;
+  technicalField: string;
+}): string {
+  const sectionInstructions: Record<string, string> = {
+    overview: `Write an OVERVIEW subsection that:
+1. Introduces the overall system architecture
+2. Describes how components interact at a high level
+3. Explains the general operating principles
+4. References specific technical elements`,
+    components: `Write a COMPONENTS subsection that:
+1. Describes each system component in detail
+2. Explains inputs, outputs, and data flows
+3. Specifies technical implementations
+4. Uses reference numerals where appropriate`,
+    algorithms: `Write an ALGORITHMS subsection that:
+1. Describes core algorithms and methods step-by-step
+2. Includes specific data structures used
+3. Explains decision logic and processing flows
+4. Provides enough detail for a person skilled in the art to reproduce`,
+    embodiments: `Write an ALTERNATIVE EMBODIMENTS subsection that:
+1. Describes at least 2-3 alternative implementations
+2. Explains how embodiments differ from the preferred one
+3. Covers different deployment scenarios
+4. Broadens the scope of protection`
+  };
+
+  return `You are a patent attorney drafting a Detailed Description of the Invention section for a US patent application.
+
+SECTION TYPE: ${vars.sectionType}
+INVENTION TITLE: ${vars.title}
+TECHNICAL FIELD: ${vars.technicalField}
+INVENTION DESCRIPTION: ${vars.inventionDescription}
+
+FEATURES:
+${vars.features}
+
+${sectionInstructions[vars.sectionType] || sectionInstructions.overview}
+
+Use formal patent language. Be technically precise and detailed.
+Write ONLY the section text, no headings or labels.`;
+}
+
+function buildAbstractPrompt(vars: {
+  title: string;
+  features: string;
+  inventionDescription: string;
+}): string {
+  return `You are a patent attorney drafting an Abstract for a US patent application.
+
+INVENTION TITLE: ${vars.title}
+INVENTION DESCRIPTION: ${vars.inventionDescription}
+
+KEY FEATURES:
+${vars.features}
+
+Write a patent Abstract (150 words or fewer) that:
+1. Begins with a statement of the technical field
+2. Concisely describes the invention's key aspects
+3. Highlights the primary technical advantage
+4. Uses formal patent language
+5. Does NOT use phrases like "This abstract..." or "The abstract..."
+
+Write ONLY the abstract text.`;
+}
+
+function buildSectionRegenerationPrompt(vars: {
+  sectionType: string;
+  currentContent: string;
+  instructions: string;
+  context: string;
+  inventionDescription: string;
+}): string {
+  return `You are a patent attorney revising a section of a US patent specification.
+
+SECTION TYPE: ${vars.sectionType}
+
+CURRENT CONTENT:
+${vars.currentContent}
+
+USER INSTRUCTIONS FOR REVISION:
+${vars.instructions}
+
+ADDITIONAL CONTEXT:
+${vars.context}
+
+INVENTION DESCRIPTION: ${vars.inventionDescription}
+
+Revise the section according to the user's instructions while:
+1. Maintaining formal patent language
+2. Keeping technical accuracy
+3. Preserving the overall structure unless instructed otherwise
+4. Ensuring consistency with the rest of the specification
+
+Write ONLY the revised section text, no headings or labels.`;
+}
+
+// Reference number coordination utilities (inline versions)
+
+export interface ReferenceValidationResult {
+  valid: boolean;
+  orphanedReferences: number[];
+  unusedDrawingReferences: number[];
+  warnings: string[];
+}
+
+export interface SpecificationWithValidation {
+  sections: SpecificationSections;
+  validation: ReferenceValidationResult;
+  cleanedSections?: SpecificationSections;
+}
+
+export interface SpecificationSections {
+  field: string;
+  background: string;
+  briefDescriptionOfDrawings: string;
+  summary: string;
+  detailedDescription: string;
+  abstract: string;
+}
+
+export interface InventionContext {
+  description?: string;
+  technicalField?: string;
+  problemSolved?: string;
+}
+
+export interface DrawingBlock {
+  id: string;
+  label: string;
+  type?: string;
+}
+
+export interface PatentDrawingData {
+  figure_number: number;
+  figure_title: string;
+  svg_content?: string;
+  blocks?: DrawingBlock[];
+}
+
+interface ReferenceNumber {
+  number: number;
+  label: string;
+  figureNumber: number;
+}
+
+// Reference number helpers
+
+function buildReferenceNumberContext(drawings: PatentDrawingData[]): string {
+  const refs = extractReferenceNumbersFromDrawings(drawings);
+  if (refs.length === 0) return '';
+
+  const lines = refs.map(r => `${r.number} - ${r.label} (FIG. ${r.figureNumber})`);
+  return `REFERENCE NUMBERS:\n${lines.join('\n')}`;
+}
+
+function generateBriefDescriptionOfDrawings(drawings: PatentDrawingData[]): string {
+  return drawings
+    .map(d => `FIG. ${d.figure_number} is a ${d.figure_title.toLowerCase()}.`)
+    .join('\n\n');
+}
+
+function extractReferenceNumbersFromDrawings(drawings: PatentDrawingData[]): ReferenceNumber[] {
+  const refs: ReferenceNumber[] = [];
+  let counter = 100;
+
+  for (const drawing of drawings) {
+    if (drawing.blocks) {
+      for (const block of drawing.blocks) {
+        refs.push({
+          number: counter,
+          label: block.label,
+          figureNumber: drawing.figure_number
+        });
+        counter += 2;
+      }
+    }
+  }
+
+  return refs;
+}
+
+function validateReferenceNumbers(
+  text: string,
+  drawings: PatentDrawingData[]
+): { valid: boolean; missingFromDrawings: number[]; unusedInSpec: number[]; warnings: string[] } {
+  const drawingRefs = extractReferenceNumbersFromDrawings(drawings);
+  const drawingNumbers = new Set(drawingRefs.map(r => r.number));
+
+  const textNumbers = new Set<number>();
+  const pattern = /\b(\d{3})\b/g;
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    const num = parseInt(match[1], 10);
+    if (num >= 100 && num < 1000) {
+      textNumbers.add(num);
+    }
+  }
+
+  const missingFromDrawings = [...textNumbers].filter(n => !drawingNumbers.has(n));
+  const unusedInSpec = [...drawingNumbers].filter(n => !textNumbers.has(n));
+  const warnings: string[] = [];
+
+  if (missingFromDrawings.length > 0) {
+    warnings.push(`Reference numbers in text but not in drawings: ${missingFromDrawings.join(', ')}`);
+  }
+  if (unusedInSpec.length > 0) {
+    warnings.push(`Reference numbers in drawings but not in text: ${unusedInSpec.join(', ')}`);
+  }
+
+  return {
+    valid: missingFromDrawings.length === 0 && unusedInSpec.length === 0,
+    missingFromDrawings,
+    unusedInSpec,
+    warnings
+  };
+}
+
+function injectFigureReferences(text: string, drawings: PatentDrawingData[]): string {
+  const refs = extractReferenceNumbersFromDrawings(drawings);
+  let result = text;
+
+  for (const ref of refs) {
+    const pattern = new RegExp(`\\b${ref.label}\\b`, 'gi');
+    result = result.replace(pattern, (match) => {
+      if (result.includes(`${match} ${ref.number}`)) return match;
+      return `${match} ${ref.number}`;
+    });
+  }
+
+  return result;
+}
+
+// Main generation functions
+
+export async function generateIntelligentSpecification(
+  title: string,
+  features: any[],
+  priorArt: any[],
+  differentiationReports: any[],
+  inventionContext?: InventionContext,
+  projectId?: string | null,
+  drawings?: PatentDrawingData[]
+): Promise<SpecificationSections> {
+  const referenceContext = drawings && drawings.length > 0
+    ? buildReferenceNumberContext(drawings)
+    : null;
+
+  const briefDescriptionOfDrawings = drawings && drawings.length > 0
+    ? generateBriefDescriptionOfDrawings(drawings)
+    : '';
+
+  const field = await generateFieldSection(title, features, inventionContext, projectId, referenceContext);
+  const background = await generateBackgroundSection(priorArt, differentiationReports, inventionContext, projectId, referenceContext);
+  const summary = await generateSummarySection(title, features, differentiationReports, inventionContext, projectId, referenceContext);
+  const detailedDescription = await generateDetailedDescriptionSection(title, features, inventionContext, projectId, referenceContext, drawings);
+  const abstract = await generateAbstractSection(title, features, inventionContext, projectId);
+
+  return {
+    field,
+    background,
+    briefDescriptionOfDrawings,
+    summary,
+    detailedDescription,
+    abstract
+  };
+}
+
+async function generateFieldSection(
+  title: string,
+  features: any[],
+  inventionContext?: InventionContext,
+  _projectId?: string | null,
+  referenceContext?: string | null
+): Promise<string> {
+  const featuresText = features
+    .map(f => `• ${f.name || f.feature_name}: ${f.type || f.feature_type}`)
+    .join('\n');
+
+  try {
+    let promptVars = {
+      title,
+      technicalField: inventionContext?.technicalField || '',
+      inventionDescription: inventionContext?.description || '',
+      features: featuresText
+    };
+
+    if (referenceContext) {
+      promptVars = {
+        ...promptVars,
+        inventionDescription: `${promptVars.inventionDescription}\n\n${referenceContext}`
+      } as any;
+    }
+
+    const prompt = buildFieldOfInventionPrompt(promptVars);
+
+    const response = await generateText(prompt, 'patent_specification_field');
+    return response.trim();
+  } catch (error) {
+    console.error('Field section generation failed:', error);
+    return 'The present invention relates generally to computer-implemented systems and methods.';
+  }
+}
+
+async function generateBackgroundSection(
+  priorArt: any[],
+  differentiationReports: any[],
+  inventionContext?: InventionContext,
+  _projectId?: string | null,
+  referenceContext?: string | null
+): Promise<string> {
+  const priorArtText = priorArt.length > 0
+    ? priorArt.map((pa, i) => `${i + 1}. ${pa.patent_number || 'Prior System'} - ${pa.patent_title || 'Existing Solution'}
+   Limitations: ${pa.similarity_explanation || 'General limitations of existing approaches'}`).join('\n\n')
+    : 'General prior art in the relevant technical field.';
+
+  const differentiationText = differentiationReports.length > 0
+    ? differentiationReports.map(dr => `- Points of Novelty: ${dr.points_of_novelty?.join(', ') || 'Novel approach to the problem'}
+- Technical Advantages: ${dr.technical_advantages?.join(', ') || 'Improved efficiency and accuracy'}`).join('\n')
+    : 'Novel approaches that address limitations in existing systems.';
+
+  try {
+    let promptVars = {
+      inventionDescription: inventionContext?.description || '',
+      problemSolved: inventionContext?.problemSolved || '',
+      priorArt: priorArtText,
+      differentiationPoints: differentiationText
+    };
+
+    if (referenceContext) {
+      promptVars.inventionDescription = `${promptVars.inventionDescription}\n\n${referenceContext}`;
+    }
+
+    const prompt = buildBackgroundPrompt(promptVars);
+
+    const response = await generateText(prompt, 'patent_specification_background');
+    return response.trim();
+  } catch (error) {
+    console.error('Background section generation failed:', error);
+    return 'The relevant technical field has seen significant advances in recent years. However, existing systems suffer from various limitations that the present invention addresses.';
+  }
+}
+
+async function generateSummarySection(
+  title: string,
+  features: any[],
+  differentiationReports: any[],
+  inventionContext?: InventionContext,
+  _projectId?: string | null,
+  referenceContext?: string | null
+): Promise<string> {
+  const coreFeatures = features.filter(f => f.isCoreInnovation || f.is_core_innovation);
+  const advantages = differentiationReports.flatMap(dr => dr.technical_advantages || []);
+
+  const featuresText = coreFeatures.length > 0
+    ? coreFeatures.map(f => `• ${f.name || f.feature_name}
+   Technical Details: ${f.technicalDetails || f.technical_description || f.description || 'Core component'}`).join('\n\n')
+    : features.slice(0, 5).map(f => `• ${f.name || f.feature_name}: ${f.technicalDetails || f.technical_description || f.description || 'Component'}`).join('\n');
+
+  const differentiationText = advantages.length > 0
+    ? advantages.map((adv, i) => `${i + 1}. ${adv}`).join('\n')
+    : 'Improved efficiency and streamlined workflow';
+
+  try {
+    let promptVars = {
+      title,
+      features: featuresText,
+      differentiationPoints: differentiationText,
+      inventionDescription: inventionContext?.description || '',
+      problemSolved: inventionContext?.problemSolved || ''
+    };
+
+    if (referenceContext) {
+      promptVars.inventionDescription = `${promptVars.inventionDescription}\n\n${referenceContext}`;
+    }
+
+    const prompt = buildSummaryPrompt(promptVars);
+
+    const response = await generateText(prompt, 'patent_specification_summary');
+    return response.trim();
+  } catch (error) {
+    console.error('Summary section generation failed:', error);
+    return 'The present invention provides a system and method with improved efficiency and quality.';
+  }
+}
+
+async function generateDetailedDescriptionChunk(
+  chunkType: 'overview' | 'components' | 'algorithms' | 'embodiments',
+  title: string,
+  features: any[],
+  inventionContext?: InventionContext,
+  _projectId?: string | null
+): Promise<string> {
+  const coreFeatures = features.filter(f => f.isCoreInnovation || f.is_core_innovation);
+
+  const featuresText = chunkType === 'algorithms'
+    ? coreFeatures.map(f => `• ${f.name || f.feature_name}
+   Technical: ${f.technicalDetails || f.technical_description || f.description || 'Algorithm component'}`).join('\n\n')
+    : chunkType === 'components'
+    ? features.map(f => `• ${f.name || f.feature_name} (${f.type || f.feature_type || 'component'})
+   Description: ${f.technicalDetails || f.technical_description || f.description || 'N/A'}
+   Novelty: ${f.noveltyStrength || f.novelty_strength || 'standard'}`).join('\n\n')
+    : features.slice(0, 6).map(f => `• ${f.name || f.feature_name}: ${f.technicalDetails || f.technical_description || f.description || 'System component'}`).join('\n');
+
+  try {
+    let promptVars = {
+      sectionType: chunkType,
+      title,
+      features: featuresText,
+      inventionDescription: inventionContext?.description || '',
+      technicalField: inventionContext?.technicalField || ''
+    };
+
+    const prompt = buildDetailedDescriptionPrompt(promptVars);
+
+    const response = await generateText(prompt, 'patent_specification_detailed');
+    return response.trim();
+  } catch (error) {
+    console.error(`Detailed description chunk (${chunkType}) generation failed:`, error);
+    return '';
+  }
+}
+
+async function generateDetailedDescriptionSection(
+  title: string,
+  features: any[],
+  inventionContext?: InventionContext,
+  projectId?: string | null,
+  referenceContext?: string | null,
+  drawings?: PatentDrawingData[]
+): Promise<string> {
+  const sections: string[] = [];
+
+  if (drawings && drawings.length > 0) {
+    const refs = extractReferenceNumbersFromDrawings(drawings);
+    if (refs.length > 0) {
+      sections.push('Referring now to the drawings, wherein like reference numerals designate corresponding parts throughout the several views:');
+      sections.push('');
+    }
+  }
+
+  const inventionContextWithRefs = referenceContext
+    ? {
+        ...inventionContext,
+        description: `${inventionContext?.description || ''}\n\n${referenceContext}`
+      }
+    : inventionContext;
+
+  const chunks = await Promise.all([
+    generateDetailedDescriptionChunk('overview', title, features, inventionContextWithRefs, projectId),
+    generateDetailedDescriptionChunk('components', title, features, inventionContextWithRefs, projectId),
+    generateDetailedDescriptionChunk('algorithms', title, features, inventionContextWithRefs, projectId),
+    generateDetailedDescriptionChunk('embodiments', title, features, inventionContextWithRefs, projectId)
+  ]);
+
+  sections.push(...chunks.filter(c => c.length > 0));
+
+  return sections.join('\n\n');
+}
+
+async function generateAbstractSection(
+  title: string,
+  features: any[],
+  inventionContext?: InventionContext,
+  _projectId?: string | null
+): Promise<string> {
+  const coreFeatures = features.filter(f => f.isCoreInnovation || f.is_core_innovation).slice(0, 3);
+
+  const featuresText = coreFeatures.length > 0
+    ? coreFeatures.map(f => `- ${f.name || f.feature_name}: ${f.technicalDetails || f.technical_description || f.description}`).join('\n')
+    : features.slice(0, 3).map(f => `- ${f.name || f.feature_name}: ${f.technicalDetails || f.technical_description || f.description || 'Component'}`).join('\n');
+
+  try {
+    const prompt = buildAbstractPrompt({
+      title,
+      features: featuresText,
+      inventionDescription: inventionContext?.description || ''
+    });
+
+    const response = await generateText(prompt, 'patent_abstract_generation');
+    return response.trim().slice(0, 1000);
+  } catch (error) {
+    console.error('Abstract section generation failed:', error);
+    return `A system and method for ${title.toLowerCase()} is disclosed. The system provides automated processing capabilities with improved efficiency.`;
+  }
+}
+
+export async function regenerateSection(
+  sectionName: string,
+  currentContent: string,
+  userFeedback: string,
+  contextData: any,
+  _projectId?: string | null
+): Promise<string> {
+  try {
+    const prompt = buildSectionRegenerationPrompt({
+      sectionType: sectionName,
+      currentContent,
+      instructions: userFeedback,
+      context: JSON.stringify(contextData, null, 2),
+      inventionDescription: contextData?.inventionDescription || ''
+    });
+
+    const response = await generateText(prompt, 'patent_section_regeneration');
+    return response.trim();
+  } catch (error) {
+    console.error('Section regeneration failed:', error);
+    return currentContent;
+  }
+}
+
+export function cleanOrphanedReferences(
+  text: string,
+  validReferenceNumbers: Set<number>
+): string {
+  const referencePattern = /(\b(?:module|system|platform|engine|component|unit|processor|database|interface|layer|manager|algorithm|service|handler|controller|generator|analyzer|tracker|pipeline|workflow|suite|model|storage|cache)\s+)(\d{3})(\b)/gi;
+
+  return text.replace(referencePattern, (match, prefix, numStr, suffix) => {
+    const num = parseInt(numStr, 10);
+    if (validReferenceNumbers.has(num)) {
+      return match;
+    }
+    return prefix.trim() + suffix;
+  });
+}
+
+export function validateSpecificationReferences(
+  sections: SpecificationSections,
+  drawings: PatentDrawingData[]
+): ReferenceValidationResult {
+  const fullText = [
+    sections.field,
+    sections.background,
+    sections.summary,
+    sections.detailedDescription,
+    sections.abstract
+  ].join('\n\n');
+
+  const validationResult = validateReferenceNumbers(fullText, drawings);
+
+  return {
+    valid: validationResult.valid,
+    orphanedReferences: validationResult.missingFromDrawings,
+    unusedDrawingReferences: validationResult.unusedInSpec,
+    warnings: validationResult.warnings
+  };
+}
+
+export function cleanSpecificationSections(
+  sections: SpecificationSections,
+  drawings: PatentDrawingData[]
+): SpecificationSections {
+  const refs = extractReferenceNumbersFromDrawings(drawings);
+  const validNumbers = new Set(refs.map(r => r.number));
+
+  return {
+    field: cleanOrphanedReferences(sections.field, validNumbers),
+    background: cleanOrphanedReferences(sections.background, validNumbers),
+    briefDescriptionOfDrawings: sections.briefDescriptionOfDrawings,
+    summary: cleanOrphanedReferences(sections.summary, validNumbers),
+    detailedDescription: cleanOrphanedReferences(sections.detailedDescription, validNumbers),
+    abstract: cleanOrphanedReferences(sections.abstract, validNumbers)
+  };
+}
+
+function applyFigureReferencesToSections(
+  sections: SpecificationSections,
+  drawings: PatentDrawingData[]
+): SpecificationSections {
+  if (!drawings || drawings.length === 0) {
+    return sections;
+  }
+
+  return {
+    field: injectFigureReferences(sections.field, drawings),
+    background: injectFigureReferences(sections.background, drawings),
+    briefDescriptionOfDrawings: sections.briefDescriptionOfDrawings,
+    summary: injectFigureReferences(sections.summary, drawings),
+    detailedDescription: injectFigureReferences(sections.detailedDescription, drawings),
+    abstract: injectFigureReferences(sections.abstract, drawings)
+  };
+}
+
+export async function generateValidatedSpecification(
+  title: string,
+  features: any[],
+  priorArt: any[],
+  differentiationReports: any[],
+  inventionContext?: InventionContext,
+  projectId?: string | null,
+  drawings?: PatentDrawingData[],
+  autoClean: boolean = true
+): Promise<SpecificationWithValidation> {
+  const sections = await generateIntelligentSpecification(
+    title,
+    features,
+    priorArt,
+    differentiationReports,
+    inventionContext,
+    projectId,
+    drawings
+  );
+
+  const drawingsArray = drawings || [];
+  const validation = validateSpecificationReferences(sections, drawingsArray);
+
+  let cleanedSections: SpecificationSections | undefined;
+  if (autoClean && !validation.valid && drawingsArray.length > 0) {
+    cleanedSections = cleanSpecificationSections(sections, drawingsArray);
+  }
+
+  let finalSections = autoClean && cleanedSections ? cleanedSections : sections;
+
+  if (drawingsArray.length > 0) {
+    finalSections = applyFigureReferencesToSections(finalSections, drawingsArray);
+    if (cleanedSections) {
+      cleanedSections = applyFigureReferencesToSections(cleanedSections, drawingsArray);
+    }
+  }
+
+  return {
+    sections: finalSections,
+    validation,
+    cleanedSections
+  };
+}

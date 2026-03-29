@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .field-input {
+    @apply w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white
+           focus:outline-none focus:ring-2 focus:ring-shield-500 focus:border-shield-500
+           placeholder:text-gray-400 transition-colors;
+  }
+
+  .field-value {
+    @apply text-sm text-gray-900;
+  }
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

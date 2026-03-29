@@ -7,9 +7,10 @@ import { SignUpPage } from './components/auth/SignUpPage';
 import { CodebaseUpload } from './components/analysis/CodebaseUpload';
 import { AnalysisResults } from './components/analysis/AnalysisResults';
 import { ProjectList } from './components/analysis/ProjectList';
+import { IPDashboard } from './components/ip/IPDashboard';
 import type { Project } from './types';
 
-type View = 'projects' | 'upload' | 'results' | 'patents' | 'copyrights' | 'trademarks';
+type View = 'projects' | 'upload' | 'results' | 'ip';
 
 function AppContent() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -38,7 +39,7 @@ function AppContent() {
   };
 
   const handleBack = () => {
-    if (view === 'patents' || view === 'copyrights' || view === 'trademarks') {
+    if (view === 'ip') {
       setView('results');
     } else {
       selectProject(null);
@@ -107,30 +108,12 @@ function AppContent() {
 
         {view === 'results' && currentProject && (
           <AnalysisResults
-            onNavigate={(target) => setView(target)}
+            onNavigate={() => setView('ip')}
           />
         )}
 
-        {view === 'patents' && currentProject && (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Patent Applications</h2>
-            <p className="text-gray-500">Patent generation — extracted beestudio services will be connected here.</p>
-            <p className="text-sm text-gray-400 mt-4">Project: {currentProject.name}</p>
-          </div>
-        )}
-
-        {view === 'copyrights' && currentProject && (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Copyright Registrations</h2>
-            <p className="text-gray-500">Copyright registration — extracted beestudio services will be connected here.</p>
-          </div>
-        )}
-
-        {view === 'trademarks' && currentProject && (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Trademark Applications</h2>
-            <p className="text-gray-500">Trademark applications — extracted beestudio services will be connected here.</p>
-          </div>
+        {view === 'ip' && currentProject && (
+          <IPDashboard />
         )}
       </main>
     </div>
