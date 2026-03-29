@@ -32,12 +32,14 @@ interface PatentOverviewTabProps {
 export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerate, aiGenerating, onNavigate }: PatentOverviewTabProps) {
   const [editMode, setEditMode] = useState(false);
   const [title, setTitle] = useState(application.title);
-  const [inventorName, setInventorName] = useState(application.inventor_name || '');
-  const [filingType, setFilingType] = useState(application.filing_type);
+  // Map from actual DB columns + metadata fallback
+  const meta = (application.metadata || {}) as Record<string, unknown>;
+  const [inventorName, setInventorName] = useState((meta.inventor_name as string) || '');
+  const [filingType, setFilingType] = useState((meta.filing_type as string) || 'provisional');
   const [status, setStatus] = useState(application.status);
-  const [inventionDescription, setInventionDescription] = useState(application.invention_description || '');
-  const [technicalField, setTechnicalField] = useState(application.technical_field || '');
-  const [problemSolved, setProblemSolved] = useState(application.problem_solved || '');
+  const [inventionDescription, setInventionDescription] = useState(application.detailed_description || '');
+  const [technicalField, setTechnicalField] = useState(application.field_of_invention || '');
+  const [problemSolved, setProblemSolved] = useState((meta.problem_solved as string) || '');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -45,12 +47,15 @@ export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerat
     try {
       await onUpdate({
         title,
-        inventor_name: inventorName || null,
-        filing_type: filingType,
         status,
-        invention_description: inventionDescription || null,
-        technical_field: technicalField || null,
-        problem_solved: problemSolved || null
+        detailed_description: inventionDescription || null,
+        field_of_invention: technicalField || null,
+        metadata: {
+          ...meta,
+          inventor_name: inventorName || null,
+          filing_type: filingType,
+          problem_solved: problemSolved || null,
+        },
       });
       setEditMode(false);
     } finally {
@@ -179,7 +184,7 @@ export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerat
                   placeholder="Inventor name"
                 />
               ) : (
-                <p className="text-sm text-gray-700">{application.inventor_name || 'Not specified'}</p>
+                <p className="text-sm text-gray-700">{(meta.inventor_name as string) || 'Not specified'}</p>
               )}
             </div>
 
@@ -199,7 +204,7 @@ export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerat
                     <option value="divisional">Divisional</option>
                   </select>
                 ) : (
-                  <p className="text-sm text-gray-700">{getFilingTypeLabel(application.filing_type)}</p>
+                  <p className="text-sm text-gray-700">{getFilingTypeLabel(((meta.filing_type as string) || 'provisional') as 'provisional' | 'non_provisional' | 'continuation' | 'cip' | 'divisional')}</p>
                 )}
               </div>
 
@@ -387,7 +392,7 @@ export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerat
           </div>
           <div>
             <h3 className="text-base font-semibold text-gray-900">Invention Details</h3>
-            {!application.invention_description && (
+            {!application.detailed_description && (
               <span className="text-xs text-amber-600 font-medium">Required for AI generation</span>
             )}
           </div>
@@ -405,9 +410,9 @@ export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerat
                 placeholder="Describe your invention in detail..."
               />
             ) : (
-              <div className={`p-4 rounded-xl text-sm ${application.invention_description ? 'bg-white border border-gray-100 shadow-sm' : 'bg-amber-50 border border-amber-200'}`}>
-                {application.invention_description ? (
-                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{application.invention_description}</p>
+              <div className={`p-4 rounded-xl text-sm ${application.detailed_description ? 'bg-white border border-gray-100 shadow-sm' : 'bg-amber-50 border border-amber-200'}`}>
+                {application.detailed_description ? (
+                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{application.detailed_description}</p>
                 ) : (
                   <p className="text-amber-700 text-xs font-medium">No description provided. Click Edit to add one for AI generation.</p>
                 )}
@@ -427,7 +432,7 @@ export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerat
                   placeholder="e.g., Computer-implemented methods"
                 />
               ) : (
-                <p className="text-sm text-gray-700">{application.technical_field || 'Not specified'}</p>
+                <p className="text-sm text-gray-700">{application.field_of_invention || 'Not specified'}</p>
               )}
             </div>
             <div>
@@ -441,7 +446,7 @@ export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerat
                   placeholder="What problem does this solve?"
                 />
               ) : (
-                <p className="text-sm text-gray-700">{application.problem_solved || 'Not specified'}</p>
+                <p className="text-sm text-gray-700">{(meta.problem_solved as string) || 'Not specified'}</p>
               )}
             </div>
           </div>
