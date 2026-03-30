@@ -110,6 +110,7 @@ interface CopyrightCandidate {
 
 async function assessCopyrights(
   projectId: string,
+  userId: string,
   projectName: string,
   features: ExtractedFeature[]
 ): Promise<string[]> {
@@ -156,7 +157,6 @@ Return 1-4 items maximum.`;
         ];
 
   const createdIds: string[] = [];
-  const currentYear = new Date().getFullYear();
 
   for (const work of works) {
     try {
@@ -164,24 +164,17 @@ Return 1-4 items maximum.`;
         .from('copyright_registrations')
         .insert({
           project_id: projectId,
+          user_id: userId,
           title: work.title,
-          alternate_titles: [],
           registration_type: work.registrationType || 'application',
           work_type: work.workType || 'literary_work',
           status: 'draft',
           description: work.description || null,
-          year_of_completion: currentYear,
-          publication_status: 'unpublished',
           author_name: 'Project Owner',
           author_type: 'individual',
-          is_anonymous: false,
-          is_pseudonymous: false,
-          claimant_type: 'individual',
           contains_ai_generated_content: false,
           ai_contribution_percentage: 0,
           ai_tools_used: [],
-          ai_documentation_complete: false,
-          fee_paid: false,
         })
         .select('id')
         .single();
@@ -211,6 +204,7 @@ interface TrademarkCandidate {
 
 async function detectTrademarks(
   projectId: string,
+  userId: string,
   projectName: string,
   features: ExtractedFeature[]
 ): Promise<string[]> {
@@ -261,20 +255,16 @@ Return 1-3 items maximum. Only include names that are distinctive enough to func
         .from('trademark_applications')
         .insert({
           project_id: projectId,
+          user_id: userId,
           mark_type: 'word_mark',
           mark_text: mark.markText,
           mark_description: mark.description || null,
-          design_search_codes: [],
-          mark_colors: [],
-          is_stylized: false,
           international_class: mark.internationalClass || 9,
-          additional_classes: [],
           goods_services_description: mark.description || `Software products and services related to ${projectName}`,
           filing_basis: 'intent_to_use',
           owner_name: 'Project Owner',
           owner_type: 'individual',
           status: 'draft',
-          fee_paid: false,
         })
         .select('id')
         .single();
@@ -428,7 +418,7 @@ export async function runFullIPAnalysis(
   try {
     reportProgress(onProgress, 'copyrights', 'Identifying copyrightable works...', 70);
 
-    const copyrightIds = await assessCopyrights(projectId, projectName, features);
+    const copyrightIds = await assessCopyrights(projectId, userId, projectName, features);
     result.copyrightRegistrationIds = copyrightIds;
 
     reportProgress(
@@ -450,7 +440,7 @@ export async function runFullIPAnalysis(
   try {
     reportProgress(onProgress, 'trademarks', 'Analyzing trademarkable names...', 85);
 
-    const trademarkIds = await detectTrademarks(projectId, projectName, features);
+    const trademarkIds = await detectTrademarks(projectId, userId, projectName, features);
     result.trademarkApplicationIds = trademarkIds;
 
     reportProgress(
