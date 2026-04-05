@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { generateText } from '../ai/geminiService';
 
-// Inline prompt builder replacing beestudio promptResolver dependency
+// Inline prompt builder for prior art search
 function buildPriorArtSearchPrompt(vars: {
   title: string;
   inventionDescription: string;
@@ -250,106 +250,21 @@ async function searchWithPromptResolver(
 }
 
 function getDefaultPriorArt(): PriorArtResult[] {
-  return [
-    {
-      patentNumber: 'US-11915708-B2',
-      title: 'Automated Patent Drafting and Analysis System',
-      abstract: 'System and method for automated patent application generation using natural language processing and machine learning to extract technical features, generate claims, and perform prior art analysis.',
-      assignee: 'IBM',
-      inventors: ['James Wong', 'Maria Rodriguez'],
-      url: 'https://patents.google.com/patent/US11915708B2',
-      relevanceScore: 82,
-      technicalSimilarityScore: 75,
-      similarityExplanation: 'Covers automated patent drafting but uses different feature extraction methods and does not include integrated workflow orchestration or multi-project management',
-      relationshipType: 'similar',
-      isBlocking: false
-    },
-    {
-      patentNumber: 'US-11348209-B1',
-      title: 'System for Automated Content Production and Cost Estimation',
-      abstract: 'A system for automated digital content production including predictive cost modeling, resource allocation optimization, and production timeline estimation using historical data and machine learning.',
-      assignee: 'Amazon Technologies Inc',
-      inventors: ['David Chen', 'Sarah Martinez'],
-      url: 'https://patents.google.com/patent/US11348209B1',
-      relevanceScore: 73,
-      technicalSimilarityScore: 65,
-      similarityExplanation: 'Addresses production cost estimation and workflow but does not include IP-specific analysis, novelty scoring, or patent specification generation',
-      relationshipType: 'different_approach',
-      isBlocking: false
-    },
-    {
-      patentNumber: 'US-11556757-B2',
-      title: 'AI-Powered Document Generation and Analysis',
-      abstract: 'Systems and methods for automatically generating structured documents using machine learning models, including automated section composition, consistency validation, and iterative refinement.',
-      assignee: 'Google LLC',
-      inventors: ['Victor Riparbelli', 'Matthias Niessner'],
-      url: 'https://patents.google.com/patent/US11556757B2',
-      relevanceScore: 78,
-      technicalSimilarityScore: 71,
-      similarityExplanation: 'Covers AI document generation but focuses on general-purpose documents rather than patent-specific specifications with legal compliance requirements',
-      relationshipType: 'similar',
-      isBlocking: false
-    },
-    {
-      patentNumber: 'US-10783691-B2',
-      title: 'Method and System for Automated Intellectual Property Analysis',
-      abstract: 'System and method for automated analysis of intellectual property portfolios including prior art assessment, novelty scoring, and strategic recommendations using machine learning.',
-      assignee: 'Anaqua Inc',
-      inventors: ['Tony DeRose', 'Stephen May'],
-      url: 'https://patents.google.com/patent/US10783691B2',
-      relevanceScore: 85,
-      technicalSimilarityScore: 73,
-      similarityExplanation: 'Covers IP portfolio analysis but uses traditional rule-based approaches rather than AI-powered generation with integrated specification drafting',
-      relationshipType: 'improvement',
-      isBlocking: false
-    },
-    {
-      patentNumber: 'US-11657231-B1',
-      title: 'AI-Powered Technical Document Analysis and Feature Extraction',
-      abstract: 'Method for automatically analyzing technical documents to extract feature information, technical claims, and innovation indicators using natural language processing and machine learning.',
-      assignee: 'Microsoft Corporation',
-      inventors: ['Michael Anderson', 'Lisa Park'],
-      url: 'https://patents.google.com/patent/US11657231B1',
-      relevanceScore: 80,
-      technicalSimilarityScore: 69,
-      similarityExplanation: 'Covers technical document analysis and feature extraction but focuses on general document processing rather than patent-specific novelty assessment and claim generation',
-      relationshipType: 'improvement',
-      isBlocking: false
-    }
-  ];
+  // Return empty — no hardcoded fallback results.
+  // If AI search fails, the user sees an empty state with option to retry.
+  return [];
 }
 
-function getFocusAreas(analysisTarget?: 'patent_management' | 'general' | 'both'): string[] {
-  const target = analysisTarget || 'both';
-
-  const patentManagementAreas = [
-    'Automated patent generation and drafting systems',
-    'AI-powered patent specification writing',
-    'Prior art search and analysis automation',
-    'Patent novelty assessment algorithms',
-    'Intellectual property portfolio management software',
-    'Patent claim generation and optimization',
-    'Patent workflow automation systems',
-    'Legal document AI generation',
-    'Patent strength evaluation and scoring',
-    'Multi-project IP management platforms'
+function getFocusAreas(_analysisTarget?: string): string[] {
+  // Generic focus areas — actual search is driven by the invention title and description,
+  // not by hardcoded domains. These are only used as fallback keywords.
+  return [
+    'Systems and methods related to the described invention',
+    'Prior art with similar technical approaches',
+    'Alternative solutions to the same problem',
+    'Foundational patents in the relevant technical domain',
+    'Recent patents with overlapping claims'
   ];
-
-  const generalAreas = [
-    'AI-assisted document generation systems',
-    'Automated technical analysis platforms',
-    'Machine learning feature extraction',
-    'Natural language processing for technical documents',
-    'Automated compliance and validation systems',
-    'Workflow orchestration platforms',
-    'Multi-provider API orchestration',
-    'Technical document consistency validation',
-    'Automated quality assessment systems'
-  ];
-
-  if (target === 'patent_management') return patentManagementAreas;
-  if (target === 'general') return generalAreas;
-  return [...patentManagementAreas, ...generalAreas];
 }
 
 async function savePriorArtResults(

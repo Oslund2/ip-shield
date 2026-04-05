@@ -3,7 +3,7 @@ import { generateText } from '../ai/geminiService';
 import { extractCodebaseFeatures, createFeatureAnalysis, createFeatureMappings } from './patentFeatureExtractionService';
 import { getPriorArtResults } from './patentPriorArtSearchService';
 
-// Inline prompt builder replacing beestudio promptResolver dependency
+// Inline prompt builder for novelty analysis
 function buildNoveltyAnalysisPrompt(vars: {
   title: string;
   features: string;
@@ -387,7 +387,7 @@ export async function performAliceRiskAssessment(
   const { data: claims } = await (supabase as any)
     .from('patent_claims')
     .select('claim_number, claim_text, claim_type')
-    .eq('patent_application_id', patentApplicationId)
+    .eq('application_id', patentApplicationId)
     .order('claim_number');
 
   const { data: features } = await (supabase as any)

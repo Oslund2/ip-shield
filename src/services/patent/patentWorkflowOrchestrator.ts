@@ -147,7 +147,7 @@ export async function generateCompletePatentApplication(
 
     const { data: existingDrawings } = await (supabase as any)
       .from('patent_drawings')
-      .select('figure_number, figure_title, svg_content, blocks')
+      .select('figure_number, title, svg_content, blocks')
       .eq('application_id', config.applicationId)
       .order('figure_number', { ascending: true });
 
@@ -224,7 +224,7 @@ async function getClaimsCount(applicationId: string): Promise<number> {
   const { count } = await (supabase as any)
     .from('patent_claims')
     .select('*', { count: 'exact', head: true })
-    .eq('patent_application_id', applicationId);
+    .eq('application_id', applicationId);
 
   return count || 0;
 }
@@ -292,7 +292,7 @@ export async function getPatentStrength(applicationId: string): Promise<{
   const { count: claimsCount } = await (supabase as any)
     .from('patent_claims')
     .select('*', { count: 'exact', head: true })
-    .eq('patent_application_id', applicationId);
+    .eq('application_id', applicationId);
 
   if (!claimsCount || claimsCount === 0) {
     missingItems.push('Patent Claims');
@@ -303,7 +303,7 @@ export async function getPatentStrength(applicationId: string): Promise<{
   const { count: drawingsCount } = await (supabase as any)
     .from('patent_drawings')
     .select('*', { count: 'exact', head: true })
-    .eq('patent_application_id', applicationId);
+    .eq('application_id', applicationId);
 
   if (!drawingsCount || drawingsCount === 0) {
     missingItems.push('Patent Drawings');

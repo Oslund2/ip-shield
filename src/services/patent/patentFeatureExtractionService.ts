@@ -83,7 +83,7 @@ function generateTechnicalSummary(features: ExtractedFeature[]): string {
     return 'No features have been extracted yet. Run a codebase analysis to populate features.';
   }
 
-  return `The system contains ${features.length} distinct technical features, of which ${strongFeatures.length} demonstrate strong novelty and ${coreFeatures.length} are core innovations. The platform provides comprehensive intellectual property protection capabilities with automated patent application generation, prior art analysis, and portfolio management.`;
+  return `The system contains ${features.length} distinct technical features, of which ${strongFeatures.length} demonstrate strong novelty and ${coreFeatures.length} are core innovations.`;
 }
 
 export async function extractFeaturesFromInvention(

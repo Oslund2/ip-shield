@@ -1,7 +1,6 @@
 import { generateText } from '../ai/geminiService';
 
 // Inline prompt builders for patent specification sections
-// These replace the beestudio promptResolver dependency with self-contained prompt generation
 
 function buildFieldOfInventionPrompt(vars: {
   title: string;

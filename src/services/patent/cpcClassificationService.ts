@@ -128,22 +128,23 @@ ${fallbackClasses}
 
 CLASSIFICATION GUIDANCE:
 
+COMMON CPC CATEGORIES (use as reference, not as default):
 1. AI/MACHINE LEARNING:
-   - G06N 3/00: Biological Models - Neural Networks (for LLMs, diffusion models, deep learning)
-   - G06N 20/00: Machine Learning (for adaptive algorithms, learning systems)
-
-2. LEGAL/IP AUTOMATION:
-   - G06Q 50/18: Legal Services (for IP management, automated patent generation)
-
-3. BUSINESS/WORKFLOW:
-   - G06Q 10/06: Project/Resource Management (for cost modeling, progress tracking)
-
-4. SOFTWARE/COMPUTING:
-   - G06F: Electric Digital Data Processing (general software and computing)
+   - G06N 3/00: Biological Models - Neural Networks
+   - G06N 20/00: Machine Learning
+2. BUSINESS/WORKFLOW:
+   - G06Q 10/06: Project/Resource Management
+   - G06Q 50/00: Industry-Specific Systems
+3. SOFTWARE/COMPUTING:
+   - G06F: Electric Digital Data Processing
+4. COMMUNICATIONS:
+   - H04L: Transmission of Digital Information
+5. DATA/DATABASES:
+   - G06F 16/00: Information Retrieval, Database Structures
 
 IMPORTANT CLASSIFICATION RULES:
-- For legal automation features: Include G06Q 50/18 but emphasize TECHNICAL implementation
-- For self-documenting patent features: Anchor in G06F (codebase scanning, AST analysis)
+- Classify based on the ACTUAL technical domain of this specific invention
+- Do NOT default to any particular domain — derive classification from the features provided
 - Be specific with subclass codes when possible
 
 Based on the invention description and technical field, select:
@@ -158,8 +159,8 @@ Respond in JSON format:
     "rationale": "Brief explanation why this is the primary classification"
   },
   "secondary": [
-    {"code": "G06Q50/18", "confidence": 0.78, "rationale": "IP management and legal automation features"},
-    {"code": "G06N3/00", "confidence": 0.72, "rationale": "Neural network-based AI generation"}
+    {"code": "G06F16/00", "confidence": 0.78, "rationale": "Relevant secondary classification based on invention features"},
+    {"code": "G06N20/00", "confidence": 0.72, "rationale": "Another relevant classification"}
   ],
   "overallRationale": "Summary explaining classification hierarchy and why primary was chosen over secondaries"
 }`;

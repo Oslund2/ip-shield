@@ -64,7 +64,7 @@ USPTO FORMATTING REQUIREMENTS:
 Format your response as a JSON array of claim strings:
 ["claim 1 text...", "claim 2 text..."]`,
     variables: [
-      { name: 'title', description: 'Patent application title', type: 'string', required: true, example: 'AI-Orchestrated Software IP Protection System' },
+      { name: 'title', description: 'Patent application title', type: 'string', required: true, example: 'System and Method for [Invention Title]' },
       { name: 'features', description: 'Core novel features in formatted text', type: 'string', required: true },
       { name: 'noveltyAnalysis', description: 'Assessment of patentability and novelty', type: 'string', required: false },
       { name: 'inventionDescription', description: 'User-provided invention description', type: 'string', required: false }
@@ -148,8 +148,8 @@ IMPORTANT:
 - Do NOT include the section heading "Field of the Invention"
 - Only provide the paragraph content itself
 - Be specific to the actual invention described
-- If the invention relates to software intellectual property protection, mention that specifically
-- If it relates to patent management software, mention that specifically`,
+- Tailor the field description to the specific technical domain of THIS invention
+- Do NOT assume any particular domain — derive the field entirely from the provided features and description`,
     variables: [
       { name: 'title', description: 'Patent application title', type: 'string', required: true },
       { name: 'technicalField', description: 'Technical field context', type: 'string', required: false },
@@ -789,8 +789,8 @@ INVENTION DESCRIPTION:
 - The abstract should be substantive enough to differentiate from prior art
 - Use all 150 words - brevity is NOT the goal, completeness IS
 
-**EXAMPLE OF PROPER TECHNICAL DEPTH:**
-"A computer-implemented system for automated software intellectual property analysis and patent application generation comprising a codebase analysis engine, a feature extraction processor, a prior art search coordinator, and a multi-stage specification generator. The codebase analysis engine parses source code repositories using abstract syntax tree traversal to extract function signatures, class hierarchies, and data flow patterns. The feature extraction processor identifies patentable features by analyzing code structure, API interfaces, and algorithmic innovations. The prior art search coordinator queries patent databases and performs novelty scoring against identified features. The multi-stage specification generator produces USPTO-compliant patent sections including claims, detailed descriptions, and abstracts using AI-driven text generation with structured output validation. The system enables end-to-end automated patent drafting while maintaining legal compliance through integrated validation workflows."
+**EXAMPLE OF PROPER TECHNICAL DEPTH (for illustration only — do NOT copy this content, generate fresh from the actual invention):**
+"A computer-implemented system for [specific technical function] comprising [component A], [component B], [component C], and [component D]. [Component A] performs [specific technical operation] using [specific technique or algorithm]. [Component B] processes [specific data type] by analyzing [specific attributes]. [Component C] coordinates [specific workflow] and performs [specific computation] against [specific data source]. [Component D] produces [specific output] using [specific method] with [specific validation]. The system enables [specific technical benefit] while maintaining [specific quality attribute] through [specific mechanism]."
 
 Generate ONLY the abstract text. Do not include any heading, label, word count, or commentary.`,
     variables: [
