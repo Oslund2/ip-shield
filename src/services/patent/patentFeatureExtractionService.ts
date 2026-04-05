@@ -216,6 +216,7 @@ export async function createFeatureAnalysis(
   const { data, error } = await (supabase as any)
     .from('patent_novelty_analyses')
     .insert({
+      application_id: patentApplicationId,
       project_id: projectId,
       patent_application_id: patentApplicationId,
       extracted_features: analysisResult.features,

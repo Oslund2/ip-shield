@@ -40,6 +40,7 @@ export async function generateDifferentiationReport(
   const { data, error } = await (supabase as any)
     .from('patent_differentiation_reports')
     .insert({
+      application_id: patentApplicationId,
       project_id: projectId,
       patent_application_id: patentApplicationId,
       prior_art_result_id: priorArtId,
