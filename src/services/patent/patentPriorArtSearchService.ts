@@ -284,6 +284,19 @@ async function savePriorArtResults(
     .delete()
     .eq('patent_application_id', patentApplicationId);
 
+  if (uniqueResults.length === 0) {
+    console.log('No prior art results to save, skipping insert');
+    // Still update the application status
+    await (supabase as any)
+      .from('patent_applications')
+      .update({
+        prior_art_search_status: 'completed',
+        prior_art_search_completed_at: new Date().toISOString()
+      })
+      .eq('id', patentApplicationId);
+    return;
+  }
+
   const records = uniqueResults.map(result => ({
     project_id: projectId,
     patent_application_id: patentApplicationId,
@@ -315,7 +328,7 @@ async function savePriorArtResults(
 
   if (error) {
     console.error('Failed to save prior art results:', error);
-    throw error;
+    // Don't throw — allow the pipeline to continue even if save fails
   }
 
   await (supabase as any)

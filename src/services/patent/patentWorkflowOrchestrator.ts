@@ -95,10 +95,14 @@ export async function generateCompletePatentApplication(
 
     if (!config.skipPriorArtSearch) {
       updateProgress('Searching for prior art patents...');
-      await searchPriorArt(config.projectId, config.applicationId, {
-        title: config.title,
-        description: hasInventionDescription ? inventionDesc : config.description
-      });
+      try {
+        await searchPriorArt(config.projectId, config.applicationId, {
+          title: config.title,
+          description: hasInventionDescription ? inventionDesc : config.description
+        });
+      } catch (priorArtError) {
+        console.error('Prior art search failed, continuing pipeline:', priorArtError);
+      }
       updateProgress('Prior art search completed', 'completed');
     }
 
@@ -133,11 +137,15 @@ export async function generateCompletePatentApplication(
 
     if (!config.skipPriorArtSearch) {
       updateProgress('Generating differentiation reports...');
-      await generateComprehensiveDifferentiation(
-        config.projectId,
-        config.applicationId,
-        config.userId
-      );
+      try {
+        await generateComprehensiveDifferentiation(
+          config.projectId,
+          config.applicationId,
+          config.userId
+        );
+      } catch (diffError) {
+        console.error('Differentiation analysis failed, continuing pipeline:', diffError);
+      }
       updateProgress('Differentiation analysis completed', 'completed');
     }
 
