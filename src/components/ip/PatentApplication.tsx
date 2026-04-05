@@ -46,12 +46,29 @@ import {
   getMaxTextWidth,
   getPageHeight,
 } from '../../services/patent/patentPdfFontService';
+import {
+  searchPriorArt,
+  getPriorArtResults,
+  addManualPriorArt,
+  updatePriorArtRelevance,
+  generatePriorArtComparison,
+} from '../../services/patent/patentPriorArtSearchService';
+import {
+  getNoveltyAnalysis,
+  performNoveltyAnalysis,
+  performAliceRiskAssessment,
+  type AliceRiskAssessment,
+} from '../../services/patent/patentNoveltyAnalysisService';
+import { generateCoverSheetHTML } from '../../services/patent/coverSheetService';
 import { PatentOverviewTab } from './patent/PatentOverviewTab';
 import { PatentSpecificationTab } from './patent/PatentSpecificationTab';
 import { PatentClaimsTab } from './patent/PatentClaimsTab';
 import { PatentDrawingsTab } from './patent/PatentDrawingsTab';
 import { PatentAbstractTab } from './patent/PatentAbstractTab';
 import { PatentExportTab } from './patent/PatentExportTab';
+import { PatentPriorArtTab } from './patent/PatentPriorArtTab';
+import { PatentAnalysisTab } from './patent/PatentAnalysisTab';
+import { PatentFilingTab } from './patent/PatentFilingTab';
 
 type TabId = 'overview' | 'specification' | 'claims' | 'drawings' | 'abstract' | 'prior-art' | 'analysis' | 'filing' | 'export';
 
@@ -79,6 +96,22 @@ export function PatentApplication() {
   const [aiProgress, setAiProgress] = useState<PatentGenerationProgress | null>(null);
   const [showAiModal, setShowAiModal] = useState(false);
   const [exportOptions, setExportOptions] = useState({ includeExemplaryClaims: false });
+
+  // Prior Art tab state
+  const [priorArtResults, setPriorArtResults] = useState<any[]>([]);
+  const [searchingPriorArt, setSearchingPriorArt] = useState(false);
+  const [comparisonReport, setComparisonReport] = useState<string | null>(null);
+  const [generatingComparison, setGeneratingComparison] = useState(false);
+
+  // Analysis tab state
+  const [noveltyAnalysis, setNoveltyAnalysis] = useState<any | null>(null);
+  const [aliceRiskAssessment, setAliceRiskAssessment] = useState<AliceRiskAssessment | null>(null);
+  const [analyzingNovelty, setAnalyzingNovelty] = useState(false);
+  const [analyzingAlice, setAnalyzingAlice] = useState(false);
+
+  // Filing tab state
+  const [coverSheetHTMLContent, setCoverSheetHTMLContent] = useState<string | null>(null);
+  const [generatingCoverSheet, setGeneratingCoverSheet] = useState(false);
 
   // Create modal state
   const [createTitle, setCreateTitle] = useState('');
@@ -239,6 +272,137 @@ export function PatentApplication() {
       setGenerating(false);
     }
   };
+
+  // --- Prior Art handlers ---
+  const handleSearchPriorArt = async () => {
+    if (!selectedApp || !projectId) return;
+    setSearchingPriorArt(true);
+    setError(null);
+    try {
+      await searchPriorArt(projectId, selectedApp.id, {
+        title: selectedApp.title,
+        description: selectedApp.invention_description || selectedApp.detailed_description || '',
+      });
+      // Reload from DB to get normalized format
+      const saved = await getPriorArtResults(selectedApp.id);
+      setPriorArtResults(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to search prior art');
+    } finally {
+      setSearchingPriorArt(false);
+    }
+  };
+
+  const handleAddManualPriorArt = async (patentNumber: string, notes?: string) => {
+    if (!selectedApp || !projectId) return;
+    try {
+      await addManualPriorArt(projectId, selectedApp.id, patentNumber, notes);
+      const saved = await getPriorArtResults(selectedApp.id);
+      setPriorArtResults(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add prior art');
+    }
+  };
+
+  const handleUpdatePriorArtRelevance = async (priorArtId: string, isRelevant: boolean) => {
+    try {
+      await updatePriorArtRelevance(priorArtId, isRelevant);
+      const saved = await getPriorArtResults(selectedApp!.id);
+      setPriorArtResults(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update relevance');
+    }
+  };
+
+  const handleGenerateComparison = async () => {
+    if (!selectedApp) return;
+    setGeneratingComparison(true);
+    try {
+      const report = await generatePriorArtComparison(selectedApp.id, []);
+      setComparisonReport(report);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate comparison');
+    } finally {
+      setGeneratingComparison(false);
+    }
+  };
+
+  // --- Analysis handlers ---
+  const handleRunNoveltyAnalysis = async () => {
+    if (!selectedApp || !projectId || !user) return;
+    setAnalyzingNovelty(true);
+    setError(null);
+    try {
+      await performNoveltyAnalysis(projectId, selectedApp.id, user.id);
+      const analysis = await getNoveltyAnalysis(selectedApp.id);
+      setNoveltyAnalysis(analysis);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run novelty analysis');
+    } finally {
+      setAnalyzingNovelty(false);
+    }
+  };
+
+  const handleRunAliceRisk = async () => {
+    if (!selectedApp || !projectId) return;
+    setAnalyzingAlice(true);
+    setError(null);
+    try {
+      const assessment = await performAliceRiskAssessment(selectedApp.id, projectId);
+      setAliceRiskAssessment(assessment);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run Alice risk assessment');
+    } finally {
+      setAnalyzingAlice(false);
+    }
+  };
+
+  // --- Filing handlers ---
+  const handleGenerateCoverSheet = () => {
+    if (!selectedApp) return;
+    setGeneratingCoverSheet(true);
+    try {
+      const html = generateCoverSheetHTML({
+        title: selectedApp.title,
+        inventors: selectedApp.inventor_name ? [{
+          id: '1',
+          fullName: selectedApp.inventor_name,
+          residence: { city: '', state: '', country: selectedApp.inventor_citizenship || 'US' },
+          citizenship: selectedApp.inventor_citizenship || 'US',
+        }] : [],
+        correspondenceAddress: selectedApp.correspondence_address || {
+          street: '', city: '', state: '', zipCode: '', country: 'US',
+        },
+        attorneyInfo: selectedApp.attorney_info || undefined,
+        entityStatus: (selectedApp.entity_status as any) || 'small_entity',
+      });
+      setCoverSheetHTMLContent(html);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate cover sheet');
+    } finally {
+      setGeneratingCoverSheet(false);
+    }
+  };
+
+  // --- Lazy load data when switching tabs ---
+  useEffect(() => {
+    if (!selectedApp) return;
+    if (activeTab === 'prior-art' && priorArtResults.length === 0) {
+      getPriorArtResults(selectedApp.id).then(setPriorArtResults).catch(() => {});
+    }
+    if (activeTab === 'analysis' && !noveltyAnalysis) {
+      getNoveltyAnalysis(selectedApp.id).then(setNoveltyAnalysis).catch(() => {});
+    }
+  }, [activeTab, selectedApp?.id]);
+
+  // Reset tab-specific state when switching applications
+  useEffect(() => {
+    setPriorArtResults([]);
+    setComparisonReport(null);
+    setNoveltyAnalysis(null);
+    setAliceRiskAssessment(null);
+    setCoverSheetHTMLContent(null);
+  }, [selectedApp?.id]);
 
   const handleAIGeneration = async () => {
     if (!selectedApp || !projectId || !user) return;
@@ -686,33 +850,37 @@ export function PatentApplication() {
                 )}
 
                 {activeTab === 'prior-art' && (
-                  <div className="text-center py-16">
-                    <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
-                      <Scroll className="w-7 h-7 text-gray-300" />
-                    </div>
-                    <p className="text-gray-500 font-medium">Prior Art analysis coming soon</p>
-                    <p className="text-gray-400 text-sm mt-1">We're working on bringing you AI-powered prior art search</p>
-                  </div>
+                  <PatentPriorArtTab
+                    priorArtResults={priorArtResults}
+                    searching={searchingPriorArt}
+                    onSearch={handleSearchPriorArt}
+                    onAddManual={handleAddManualPriorArt}
+                    onUpdateRelevance={handleUpdatePriorArtRelevance}
+                    onGenerateComparison={handleGenerateComparison}
+                    comparisonReport={comparisonReport}
+                    generatingComparison={generatingComparison}
+                  />
                 )}
 
                 {activeTab === 'analysis' && (
-                  <div className="text-center py-16">
-                    <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
-                      <BarChart3 className="w-7 h-7 text-gray-300" />
-                    </div>
-                    <p className="text-gray-500 font-medium">AI Analysis coming soon</p>
-                    <p className="text-gray-400 text-sm mt-1">Deep patent strength and patentability analysis</p>
-                  </div>
+                  <PatentAnalysisTab
+                    noveltyAnalysis={noveltyAnalysis}
+                    aliceRiskAssessment={aliceRiskAssessment}
+                    analyzing={analyzingNovelty}
+                    analyzingAlice={analyzingAlice}
+                    onRunNoveltyAnalysis={handleRunNoveltyAnalysis}
+                    onRunAliceRisk={handleRunAliceRisk}
+                    hasClaims={selectedApp.claims.length > 0}
+                  />
                 )}
 
                 {activeTab === 'filing' && (
-                  <div className="text-center py-16">
-                    <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
-                      <ClipboardCheck className="w-7 h-7 text-gray-300" />
-                    </div>
-                    <p className="text-gray-500 font-medium">Filing tools coming soon</p>
-                    <p className="text-gray-400 text-sm mt-1">Automated USPTO filing preparation</p>
-                  </div>
+                  <PatentFilingTab
+                    application={selectedApp}
+                    onGenerateCoverSheet={handleGenerateCoverSheet}
+                    coverSheetHTML={coverSheetHTMLContent}
+                    generatingCoverSheet={generatingCoverSheet}
+                  />
                 )}
 
                 {activeTab === 'export' && (
