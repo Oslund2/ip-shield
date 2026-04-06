@@ -180,9 +180,9 @@ export async function generateCompletePatentApplication(
       .order('figure_number', { ascending: true });
 
     const inventionContext: InventionContext | undefined = hasInventionDescription ? {
-      description: appData.invention_description,
-      technicalField: appData.technical_field || undefined,
-      problemSolved: appData.problem_solved || undefined
+      description: inventionDesc,
+      technicalField: (appData?.field_of_invention as string) || undefined,
+      problemSolved: (meta.problem_solved as string) || undefined
     } : undefined;
 
     const specification = await generateIntelligentSpecification(

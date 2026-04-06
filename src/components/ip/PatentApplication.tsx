@@ -11,15 +11,11 @@ import {
   AlertCircle,
   Scroll,
   X,
-  Sparkles,
   BarChart3,
   ClipboardCheck,
   Trash2,
   Search,
-  Code,
-  GitCompare,
-  CheckCircle,
-  Clock
+  Users
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProject } from '../../contexts/ProjectContext';
@@ -40,10 +36,6 @@ import {
 } from '../../services/patent/patentApplicationService';
 import { generateClaimsForApplication } from '../../services/patent/patentClaimsService';
 import { generateDrawingsForApplication, regenerateSingleDrawing, svgToDataUrl } from '../../services/patent/patentDrawingsService';
-import {
-  generateCompletePatentApplication,
-  type PatentGenerationProgress
-} from '../../services/patent/patentWorkflowOrchestrator';
 import {
   createUsptoCompliantPdf,
   setPatentFont,
@@ -67,6 +59,7 @@ import {
 } from '../../services/patent/patentNoveltyAnalysisService';
 import { generateCoverSheetHTML } from '../../services/patent/coverSheetService';
 import { PatentOverviewTab } from './patent/PatentOverviewTab';
+import { PatentApplicantTab } from './patent/PatentApplicantTab';
 import { PatentSpecificationTab } from './patent/PatentSpecificationTab';
 import { PatentClaimsTab } from './patent/PatentClaimsTab';
 import { PatentDrawingsTab } from './patent/PatentDrawingsTab';
@@ -76,181 +69,9 @@ import { PatentPriorArtTab } from './patent/PatentPriorArtTab';
 import { PatentAnalysisTab } from './patent/PatentAnalysisTab';
 import { PatentFilingTab } from './patent/PatentFilingTab';
 
-type TabId = 'overview' | 'specification' | 'claims' | 'drawings' | 'abstract' | 'prior-art' | 'analysis' | 'filing' | 'export';
+type TabId = 'overview' | 'applicant' | 'specification' | 'claims' | 'drawings' | 'abstract' | 'prior-art' | 'analysis' | 'filing' | 'export';
 
 // --- Generation Progress Modal ---
-
-const GENERATION_STEPS = [
-  { key: 'prior-art', label: 'Prior Art', icon: Search },
-  { key: 'features', label: 'Features', icon: Code },
-  { key: 'novelty', label: 'Novelty', icon: BarChart3 },
-  { key: 'differentiation', label: 'Compare', icon: GitCompare },
-  { key: 'specification', label: 'Specification', icon: FileText },
-  { key: 'claims', label: 'Claims', icon: List },
-  { key: 'drawings', label: 'Drawings', icon: Image },
-];
-
-function mapProgressToStepIndex(currentStep: string, completedCount: number): number {
-  const lower = currentStep.toLowerCase();
-  if (lower.includes('prior art')) return 0;
-  if (lower.includes('feature') || lower.includes('extracting')) return 1;
-  if (lower.includes('novelty') || lower.includes('patentability')) return 2;
-  if (lower.includes('differentiation') || lower.includes('comparing')) return 3;
-  if (lower.includes('specification') || lower.includes('field') || lower.includes('background') || lower.includes('summary') || lower.includes('description') || lower.includes('abstract')) return 4;
-  if (lower.includes('claim')) return 5;
-  if (lower.includes('drawing')) return 6;
-  return Math.min(completedCount, GENERATION_STEPS.length - 1);
-}
-
-function formatElapsed(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}:${sec.toString().padStart(2, '0')}`;
-}
-
-function GenerationProgressModal({ aiProgress, aiGenerating, onClose }: {
-  aiProgress: PatentGenerationProgress | null;
-  aiGenerating: boolean;
-  onClose: () => void;
-}) {
-  const [elapsed, setElapsed] = useState(0);
-  const startRef = useRef(Date.now());
-  const [metrics, setMetrics] = useState<Record<string, string>>({});
-
-  // Elapsed timer
-  useEffect(() => {
-    if (!aiGenerating) return;
-    startRef.current = Date.now();
-    const interval = setInterval(() => setElapsed(Date.now() - startRef.current), 1000);
-    return () => clearInterval(interval);
-  }, [aiGenerating]);
-
-  // Accumulate metrics from progress data
-  useEffect(() => {
-    if (!aiProgress?.data) return;
-    const d = aiProgress.data;
-    setMetrics(prev => {
-      const next = { ...prev };
-      if (d.priorArtCount !== undefined) next.priorArt = `${d.priorArtCount} patents found`;
-      if (d.featureCount !== undefined) next.features = `${d.featureCount} features extracted`;
-      if (d.score !== undefined) next.novelty = `Score: ${Math.round(d.score)}/100`;
-      if (d.confidence !== undefined) next.confidence = `Confidence: ${Math.round(d.confidence)}%`;
-      if (d.sections !== undefined) next.spec = `${d.sections} sections generated`;
-      if (d.claimsCount !== undefined) next.claims = `${d.claimsCount} claims generated`;
-      if (d.drawingsCount !== undefined) next.drawings = `${d.drawingsCount} drawings created`;
-      return next;
-    });
-  }, [aiProgress?.data]);
-
-  const activeStepIndex = aiProgress
-    ? mapProgressToStepIndex(aiProgress.currentStep, aiProgress.step)
-    : 0;
-  const completedStepCount = aiProgress?.step || 0;
-  const totalSteps = aiProgress?.totalSteps || 7;
-  const pct = Math.round((completedStepCount / totalSteps) * 100);
-
-  return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-200">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-base font-semibold text-gray-900">Generating Patent Application</h3>
-              <p className="text-xs text-gray-500">AI is analyzing your codebase and drafting documentation</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg">
-            <Clock className="w-3.5 h-3.5" />
-            {formatElapsed(elapsed)}
-          </div>
-        </div>
-
-        {/* Step indicators */}
-        <div className="flex items-center justify-between mb-8">
-          {GENERATION_STEPS.map((step, idx) => {
-            const StepIcon = step.icon;
-            const isCompleted = idx < activeStepIndex || (aiProgress?.status === 'completed' && !aiGenerating);
-            const isActive = idx === activeStepIndex && aiGenerating;
-            return (
-              <div key={step.key} className="flex items-center flex-1 last:flex-initial">
-                <div className="flex flex-col items-center">
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ${
-                    isCompleted
-                      ? 'bg-green-100 text-green-600'
-                      : isActive
-                        ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20'
-                        : 'bg-gray-100 text-gray-400'
-                  }`}>
-                    {isCompleted ? (
-                      <CheckCircle className="w-4.5 h-4.5" />
-                    ) : (
-                      <StepIcon className={`w-4 h-4 ${isActive ? 'animate-pulse' : ''}`} />
-                    )}
-                  </div>
-                  <span className={`text-[10px] font-medium mt-1.5 ${
-                    isActive ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-400'
-                  }`}>
-                    {step.label}
-                  </span>
-                </div>
-                {idx < GENERATION_STEPS.length - 1 && (
-                  <div className={`flex-1 h-0.5 mx-2 mt-[-1rem] rounded-full transition-colors duration-500 ${
-                    isCompleted ? 'bg-green-300' : 'bg-gray-200'
-                  }`} />
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Progress bar */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-sm font-medium text-gray-700 truncate max-w-[80%]">
-              {aiProgress?.currentStep || 'Initializing...'}
-            </span>
-            <span className="text-sm font-semibold text-blue-600">{pct}%</span>
-          </div>
-          <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-500"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Live metrics */}
-        {Object.keys(metrics).length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {Object.entries(metrics).map(([key, value]) => (
-              <span key={key} className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                <CheckCircle className="w-3 h-3 text-green-500" />
-                {value}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Close button */}
-        {!aiGenerating && (
-          <div className="text-center mt-4">
-            <button
-              onClick={onClose}
-              className="px-6 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
-            >
-              Close
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 export function PatentApplication() {
   const { user } = useAuth();
@@ -272,9 +93,6 @@ export function PatentApplication() {
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingSection, setExportingSection] = useState<string | null>(null);
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiProgress, setAiProgress] = useState<PatentGenerationProgress | null>(null);
-  const [showAiModal, setShowAiModal] = useState(false);
   const [exportOptions, setExportOptions] = useState({ includeExemplaryClaims: false });
 
   // Prior Art tab state
@@ -648,34 +466,6 @@ Respond with ONLY the JSON object.`;
     setCoverSheetHTMLContent(null);
   }, [selectedApp?.id]);
 
-  const handleAIGeneration = async () => {
-    if (!selectedApp || !projectId || !user) return;
-    setAiGenerating(true);
-    setShowAiModal(true);
-    setError(null);
-    try {
-      await generateCompletePatentApplication(
-        {
-          applicationId: selectedApp.id,
-          projectId,
-          userId: user.id,
-          title: selectedApp.title,
-          description: selectedApp.invention_description || '',
-          skipPriorArtSearch: false,
-          useAIClaims: true
-        },
-        (progress) => { setAiProgress(progress); }
-      );
-      await loadApplication(selectedApp.id);
-      setShowAiModal(false);
-      setAiProgress(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate patent application');
-    } finally {
-      setAiGenerating(false);
-    }
-  };
-
   const handleExportPDF = async () => {
     if (!selectedApp) return;
     setExporting(true);
@@ -846,6 +636,7 @@ Respond with ONLY the JSON object.`;
 
   const tabs: { id: TabId; label: string; icon: React.ElementType }[] = [
     { id: 'overview', label: 'Overview', icon: Shield },
+    { id: 'applicant', label: 'Applicant', icon: Users },
     { id: 'specification', label: 'Specification', icon: FileText },
     { id: 'claims', label: 'Claims', icon: List },
     { id: 'drawings', label: 'Drawings', icon: Image },
@@ -973,17 +764,6 @@ Respond with ONLY the JSON object.`;
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleAIGeneration}
-                    disabled={aiGenerating}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 transition-all shadow-sm"
-                  >
-                    {aiGenerating ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
-                    ) : (
-                      <><Sparkles className="w-4 h-4" /> Generate</>
-                    )}
-                  </button>
-                  <button
                     onClick={handleExportPDF}
                     disabled={exporting}
                     className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:shadow-sm disabled:opacity-50 transition-all"
@@ -1027,9 +807,17 @@ Respond with ONLY the JSON object.`;
                       setSelectedApp({ ...selectedApp, ...updates });
                     }}
                     onDelete={() => setShowDeleteModal(true)}
-                    onAIGenerate={handleAIGeneration}
-                    aiGenerating={aiGenerating}
                     onNavigate={(tabId) => setActiveTab(tabId as TabId)}
+                  />
+                )}
+
+                {activeTab === 'applicant' && (
+                  <PatentApplicantTab
+                    application={selectedApp}
+                    onUpdate={async (updates) => {
+                      await updatePatentApplication(selectedApp.id, updates);
+                      setSelectedApp({ ...selectedApp, ...updates });
+                    }}
                   />
                 )}
 
@@ -1278,13 +1066,6 @@ Respond with ONLY the JSON object.`;
       )}
 
       {/* AI Generation Progress Modal */}
-      {showAiModal && (
-        <GenerationProgressModal
-          aiProgress={aiProgress}
-          aiGenerating={aiGenerating}
-          onClose={() => { setShowAiModal(false); setAiProgress(null); }}
-        />
-      )}
     </div>
   );
 }

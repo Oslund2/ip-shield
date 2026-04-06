@@ -15,6 +15,16 @@ import { generateCompletePatentApplication } from '../patent/patentWorkflowOrche
 import type { InnovationCluster, IPOrchestrationProgress, IPAnalysisResult } from '../../types';
 
 // ---------------------------------------------------------------------------
+// Applicant info passed from the upload form
+// ---------------------------------------------------------------------------
+
+export interface ApplicantInfo {
+  inventorName: string;
+  entityStatus?: 'micro_entity' | 'small_entity' | 'regular';
+  citizenship?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -170,7 +180,7 @@ Return 1-4 items maximum.`;
           work_type: work.workType || 'literary_work',
           status: 'draft',
           description: work.description || null,
-          author_name: 'Project Owner',
+          author_name: applicantInfo?.inventorName || 'Project Owner',
           author_type: 'individual',
           contains_ai_generated_content: false,
           ai_contribution_percentage: 0,
@@ -262,7 +272,7 @@ Return 1-3 items maximum. Only include names that are distinctive enough to func
           international_class: mark.internationalClass || 9,
           goods_services_description: mark.description || `Software products and services related to ${projectName}`,
           filing_basis: 'intent_to_use',
-          owner_name: 'Project Owner',
+          owner_name: applicantInfo?.inventorName || 'Project Owner',
           owner_type: 'individual',
           status: 'draft',
         })
@@ -290,7 +300,8 @@ export async function runFullIPAnalysis(
   projectId: string,
   userId: string,
   projectName: string,
-  onProgress?: (progress: IPOrchestrationProgress) => void
+  onProgress?: (progress: IPOrchestrationProgress) => void,
+  applicantInfo?: ApplicantInfo
 ): Promise<IPAnalysisResult> {
   const result: IPAnalysisResult = {
     patentApplicationIds: [],
@@ -379,11 +390,16 @@ export async function runFullIPAnalysis(
           cluster.description
         );
 
-        // Create the patent application with README-enriched description
+        // Create the patent application with README-enriched description + applicant info
         const app = await createPatentApplication(projectId, userId, {
           title: cluster.title,
           inventionDescription: inventionDesc,
           technicalField: cluster.technicalField,
+          ...(applicantInfo && {
+            inventor_name: applicantInfo.inventorName,
+            entity_status: applicantInfo.entityStatus || 'micro_entity',
+            inventor_citizenship: applicantInfo.citizenship || 'US Citizen',
+          }),
         });
 
         reportProgress(
@@ -402,6 +418,20 @@ export async function runFullIPAnalysis(
           description: inventionDesc,
           skipPriorArtSearch: false,
           useAIClaims: true,
+        }, (subProgress) => {
+          const subPct = basePercent + perPatent * 0.3 + (perPatent * 0.65 * (subProgress.step / Math.max(subProgress.totalSteps, 1)));
+          onProgress?.({
+            phase: 'patents',
+            step: subProgress.currentStep,
+            overallPercent: Math.round(subPct),
+            detail: cluster.title,
+            patentSubStep: subProgress.currentStep,
+            patentIndex: i,
+            patentTotal: clusters.length,
+            metrics: subProgress.data ? Object.fromEntries(
+              Object.entries(subProgress.data).filter(([, v]) => v !== undefined)
+            ) as Record<string, string | number> : undefined,
+          });
         });
 
         if (genResult.success) {

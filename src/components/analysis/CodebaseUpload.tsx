@@ -1,15 +1,15 @@
-import { useState } from 'react';
-import { GitFork, Loader2, ArrowRight, AlertCircle, X, CheckCircle, Code, Search, Sparkles, FileText, Shield } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { GitFork, Loader2, ArrowRight, AlertCircle, X, CheckCircle, Code, Search, Sparkles, FileText, Shield, Clock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProject } from '../../contexts/ProjectContext';
 import { ingestFromGitHub, getLanguageBreakdown } from '../../services/analysis/codebaseIngestionService';
 import { analyzeCodebase } from '../../services/analysis/codebaseAnalysisEngine';
-import { runFullIPAnalysis } from '../../services/orchestration/ipAutoOrchestrator';
+import { runFullIPAnalysis, type ApplicantInfo } from '../../services/orchestration/ipAutoOrchestrator';
 import { supabase } from '../../lib/supabase';
 import type { AnalysisProgress } from '../../types';
 
 interface CodebaseUploadProps {
-  onAnalysisComplete: () => void;
+  onAnalysisComplete: (project: { id: string; name: string; source_type: string; source_url: string; [key: string]: any }) => void;
 }
 
 const STEP_CONFIG = [
@@ -25,9 +25,28 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
   const { user, session } = useAuth();
   const { createProject, updateProject } = useProject();
   const [repoUrl, setRepoUrl] = useState('');
+  const [inventorName, setInventorName] = useState('');
+  const [entityStatus, setEntityStatus] = useState<'micro_entity' | 'small_entity' | 'regular'>('micro_entity');
+  const [showMoreApplicant, setShowMoreApplicant] = useState(false);
+  const [citizenship, setCitizenship] = useState('US Citizen');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress | null>(null);
   const [error, setError] = useState('');
+  const [elapsed, setElapsed] = useState(0);
+  const [metrics, setMetrics] = useState<Record<string, string>>({});
+  const startRef = useRef(0);
+
+  useEffect(() => {
+    if (!loading) { setElapsed(0); return; }
+    startRef.current = Date.now();
+    const interval = setInterval(() => setElapsed(Date.now() - startRef.current), 1000);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  const formatElapsed = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+  };
 
   const handleGitHubAnalysis = async () => {
     if (!repoUrl.trim() || !user) return;
@@ -82,23 +101,41 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
 
       // Auto-generate all IP applications
       setProgress({ step: 'generating_patents', progress: 55, message: 'Generating patent applications...' });
+      const applicant: ApplicantInfo | undefined = inventorName.trim()
+        ? { inventorName: inventorName.trim(), entityStatus, citizenship: citizenship.trim() || undefined }
+        : undefined;
       await runFullIPAnalysis(project.id, user.id, project.name, (ipProgress) => {
         const basePercent = 55;
         const pct = basePercent + Math.round(ipProgress.overallPercent * 0.4);
         const stepKey = ipProgress.phase === 'patents' ? 'generating_patents' : 'assessing_ip';
+        const patentLabel = ipProgress.patentTotal && ipProgress.patentTotal > 1
+          ? ` (Patent ${(ipProgress.patentIndex ?? 0) + 1}/${ipProgress.patentTotal})`
+          : '';
         setProgress({
           step: stepKey as AnalysisProgress['step'],
           progress: Math.min(pct, 95),
-          message: ipProgress.step,
+          message: `${ipProgress.step}${patentLabel}`,
           detail: ipProgress.detail,
         });
-      });
+        if (ipProgress.metrics) {
+          setMetrics(prev => {
+            const next = { ...prev };
+            const m = ipProgress.metrics!;
+            if (m.featureCount) next.features = `${m.featureCount} features`;
+            if (m.score) next.novelty = `Novelty: ${Math.round(Number(m.score))}/100`;
+            if (m.claimsCount) next.claims = `${m.claimsCount} claims`;
+            if (m.drawingsCount) next.drawings = `${m.drawingsCount} drawings`;
+            if (m.priorArtCount) next.priorArt = `${m.priorArtCount} prior art`;
+            return next;
+          });
+        }
+      }, applicant);
 
       setProgress({
         step: 'complete', progress: 100,
         message: 'IP analysis complete! Patents, copyrights, and trademarks generated.',
       });
-      setTimeout(onAnalysisComplete, 1500);
+      setTimeout(() => onAnalysisComplete(project), 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setProgress(null);
@@ -147,6 +184,61 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
                 onKeyDown={(e) => e.key === 'Enter' && handleGitHubAnalysis()}
               />
             </div>
+
+            {/* Applicant Information */}
+            <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Applicant Information</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Inventor Full Name *</label>
+                  <input
+                    type="text"
+                    value={inventorName}
+                    onChange={(e) => setInventorName(e.target.value)}
+                    placeholder="Jane Smith"
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-shield-500 focus:border-transparent"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Entity Status</label>
+                  <select
+                    value={entityStatus}
+                    onChange={(e) => setEntityStatus(e.target.value as typeof entityStatus)}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-shield-500 focus:border-transparent"
+                    disabled={loading}
+                  >
+                    <option value="micro_entity">Micro Entity</option>
+                    <option value="small_entity">Small Entity</option>
+                    <option value="regular">Regular (Large) Entity</option>
+                  </select>
+                </div>
+              </div>
+
+              {!showMoreApplicant ? (
+                <button
+                  type="button"
+                  onClick={() => setShowMoreApplicant(true)}
+                  className="text-xs text-shield-600 hover:text-shield-700 font-medium mt-2"
+                  disabled={loading}
+                >
+                  + Add citizenship details
+                </button>
+              ) : (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Citizenship</label>
+                  <input
+                    type="text"
+                    value={citizenship}
+                    onChange={(e) => setCitizenship(e.target.value)}
+                    placeholder="US Citizen"
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-shield-500 focus:border-transparent"
+                    disabled={loading}
+                  />
+                </div>
+              )}
+            </div>
+
             <button
               onClick={handleGitHubAnalysis}
               disabled={loading || !repoUrl.trim()}
@@ -199,7 +291,15 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
           {/* Progress bar */}
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">{progress.message}</span>
-            <span className="text-sm font-semibold text-shield-600">{Math.round(progress.progress)}%</span>
+            <div className="flex items-center gap-3">
+              {loading && (
+                <span className="flex items-center gap-1.5 text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg">
+                  <Clock className="w-3.5 h-3.5" />
+                  {formatElapsed(elapsed)}
+                </span>
+              )}
+              <span className="text-sm font-semibold text-shield-600">{Math.round(progress.progress)}%</span>
+            </div>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2.5">
             <div
@@ -207,8 +307,21 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
               style={{ width: `${progress.progress}%` }}
             />
           </div>
+
+          {/* Live metrics */}
+          {Object.keys(metrics).length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {Object.entries(metrics).map(([key, value]) => (
+                <span key={key} className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-100">
+                  <CheckCircle className="w-3 h-3 text-green-500" />
+                  {value}
+                </span>
+              ))}
+            </div>
+          )}
+
           {progress.detail && (
-            <p className="text-xs text-gray-400 mt-3 truncate">{progress.detail}</p>
+            <p className="text-xs text-gray-400 mt-2 truncate">{progress.detail}</p>
           )}
         </div>
       )}

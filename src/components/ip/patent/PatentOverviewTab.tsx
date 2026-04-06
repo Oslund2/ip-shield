@@ -24,12 +24,10 @@ interface PatentOverviewTabProps {
   application: PatentApplicationWithDetails;
   onUpdate: (updates: Partial<PatentApplication>) => Promise<void>;
   onDelete: () => void;
-  onAIGenerate: () => void;
-  aiGenerating: boolean;
   onNavigate: (tabId: string) => void;
 }
 
-export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerate, aiGenerating, onNavigate }: PatentOverviewTabProps) {
+export function PatentOverviewTab({ application, onUpdate, onDelete, onNavigate }: PatentOverviewTabProps) {
   const [editMode, setEditMode] = useState(false);
   const [title, setTitle] = useState(application.title);
   // Map from actual DB columns + metadata fallback
@@ -122,17 +120,6 @@ export function PatentOverviewTab({ application, onUpdate, onDelete, onAIGenerat
             </>
           ) : (
             <>
-              <button
-                onClick={onAIGenerate}
-                disabled={aiGenerating}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 transition-all shadow-sm"
-              >
-                {aiGenerating ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
-                ) : (
-                  <><Sparkles className="w-4 h-4" /> {application.full_application_status !== 'not_started' ? 'Regenerate with AI' : 'Generate with AI'}</>
-                )}
-              </button>
               <button
                 onClick={() => setEditMode(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:shadow-sm transition-all"

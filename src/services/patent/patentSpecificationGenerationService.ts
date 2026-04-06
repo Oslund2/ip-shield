@@ -179,15 +179,19 @@ INVENTION DESCRIPTION: ${vars.inventionDescription}
 KEY FEATURES:
 ${vars.features}
 
-Write a patent Abstract (150 words or fewer) that:
-1. Begins with a statement of the technical field
-2. Concisely describes the invention by referencing the specific features listed above
-3. Highlights the primary technical advantage
-4. Uses formal patent language
-5. Does NOT use phrases like "This abstract..." or "The abstract..."
-6. Every component or capability mentioned MUST correspond to an actual feature listed above
+${GROUNDING_RULE}
 
-Write ONLY the abstract text.`;
+Write a patent Abstract that is EXACTLY 150 words (USPTO maximum). The abstract MUST be a single, complete paragraph — do NOT cut off mid-sentence. Requirements:
+1. Begin with a statement of the technical field
+2. Concisely describe the invention by referencing ONLY the specific features listed above
+3. Highlight the primary technical advantage or problem solved
+4. Use formal patent language appropriate for USPTO filing
+5. Do NOT use phrases like "This abstract..." or "The abstract..."
+6. Every component, module, algorithm, or capability mentioned MUST correspond to an actual feature listed above — do NOT invent functionality
+7. If the INVENTION DESCRIPTION is provided, the abstract MUST be consistent with it — it is the authoritative source of what the software does
+8. Do NOT use generic academic or scientific jargon (e.g., "machine learning models", "behavioral patterns", "geospatial processing") unless those terms appear in the features or invention description
+
+Write ONLY the abstract text — no headings, labels, or word counts.`;
 }
 
 function buildSectionRegenerationPrompt(vars: {

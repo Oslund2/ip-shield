@@ -93,8 +93,8 @@ function WidgetContent({
 
       {view === 'upload' && (
         <CodebaseUpload
-          onAnalysisComplete={() => {
-            onAnalysisComplete?.(currentProject?.id || '');
+          onAnalysisComplete={(project) => {
+            onAnalysisComplete?.(project?.id || currentProject?.id || '');
             setView('projects');
           }}
         />

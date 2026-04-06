@@ -53,6 +53,10 @@ export interface IPOrchestrationProgress {
   step: string;
   overallPercent: number;
   detail?: string;
+  patentSubStep?: string;
+  patentIndex?: number;
+  patentTotal?: number;
+  metrics?: Record<string, string | number>;
 }
 
 export interface IPAnalysisResult {

@@ -468,6 +468,9 @@ export function validateAbstract(abstract: string): { valid: boolean; wordCount:
   if (wordCount > 150) {
     return { valid: false, wordCount, message: `Abstract exceeds 150 word limit (${wordCount} words)` };
   }
+  if (wordCount < 50) {
+    return { valid: false, wordCount, message: `Abstract is too short — USPTO requires a complete summary (min ~50 words)` };
+  }
   return { valid: true, wordCount, message: `${wordCount}/150 words` };
 }
 

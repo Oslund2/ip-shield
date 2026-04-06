@@ -18,7 +18,7 @@ export function PatentAbstractTab({ abstract, editing, saving, onEdit, onChange,
 
   const getWordCountBadgeStyle = () => {
     if (!abstract || validation.wordCount === 0) return 'bg-gray-100 text-gray-500 border-gray-200';
-    if (validation.wordCount > 150) return 'bg-red-50 text-red-700 border-red-200';
+    if (validation.wordCount > 150 || validation.wordCount < 50) return 'bg-red-50 text-red-700 border-red-200';
     if (validation.wordCount > 120) return 'bg-amber-50 text-amber-700 border-amber-200';
     return 'bg-emerald-50 text-emerald-700 border-emerald-200';
   };
@@ -93,7 +93,7 @@ export function PatentAbstractTab({ abstract, editing, saving, onEdit, onChange,
           <div className="flex items-center gap-3">
             <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold ${getWordCountBadgeStyle()}`}>
               <span className={`w-2 h-2 rounded-full ${
-                validation.wordCount > 150 ? 'bg-red-500' : validation.wordCount > 120 ? 'bg-amber-500' : validation.wordCount > 0 ? 'bg-emerald-500' : 'bg-gray-400'
+                validation.wordCount > 150 || (validation.wordCount > 0 && validation.wordCount < 50) ? 'bg-red-500' : validation.wordCount > 120 ? 'bg-amber-500' : validation.wordCount > 0 ? 'bg-emerald-500' : 'bg-gray-400'
               }`} />
               {validation.wordCount}/150 words
             </span>
@@ -105,7 +105,7 @@ export function PatentAbstractTab({ abstract, editing, saving, onEdit, onChange,
             <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
-                  validation.wordCount > 150
+                  validation.wordCount > 150 || validation.wordCount < 50
                     ? 'bg-red-500'
                     : validation.wordCount > 120
                     ? 'bg-amber-400'
