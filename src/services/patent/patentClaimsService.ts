@@ -161,11 +161,17 @@ async function generateIndependentClaims(
   const result = await makeAIRequest<string[]>(
     prompt,
     (response) => {
-      const claims = parseJSONArray<string>(response);
+      const rawClaims = parseJSONArray<any>(response);
+      // The prompt returns objects like {number, type, text, noveltyBasis} — extract the text
+      const claims = rawClaims.map((c: any) => {
+        if (typeof c === 'string') return c;
+        if (typeof c === 'object' && c !== null) return c.text || c.claim_text || c.claimText || '';
+        return '';
+      }).filter((c: string) => typeof c === 'string' && c.length > 50);
       if (claims.length < 2) {
         console.warn(`AI generated only ${claims.length} independent claims, expected 2-4`);
       }
-      return claims.filter(c => typeof c === 'string' && c.length > 50);
+      return claims;
     },
     DEFAULT_INDEPENDENT_CLAIMS,
     {
@@ -196,7 +202,7 @@ function isValidDependentClaim(item: unknown): item is DependentClaimItem {
 
   // Accept common AI format variants
   const text = obj.claimText || obj.claim_text || obj.text || '';
-  const parent = obj.parentClaimNumber ?? obj.parent_claim_number ?? obj.parentClaim ?? obj.parent;
+  const parent = obj.parentClaimNumber ?? obj.parent_claim_number ?? obj.parentClaim ?? obj.parent ?? obj.dependsOn ?? obj.depends_on;
 
   if (typeof text === 'string' && text.length > 30 && (typeof parent === 'number' || typeof parent === 'string')) {
     // Normalize into expected shape
