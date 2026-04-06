@@ -94,19 +94,21 @@ export async function generateCompletePatentApplication(
     const hasInventionDescription = inventionDesc.trim().length > 0;
 
     if (!config.skipPriorArtSearch) {
-      updateProgress('Searching for prior art patents...');
+      updateProgress(`Searching prior art for "${config.title.substring(0, 50)}"...`);
+      let priorArtCount = 0;
       try {
-        await searchPriorArt(config.projectId, config.applicationId, {
+        const paResults = await searchPriorArt(config.projectId, config.applicationId, {
           title: config.title,
           description: hasInventionDescription ? inventionDesc : config.description
         });
+        priorArtCount = paResults?.length || 0;
       } catch (priorArtError) {
         console.error('Prior art search failed, continuing pipeline:', priorArtError);
       }
-      updateProgress('Prior art search completed', 'completed');
+      updateProgress('Prior art search completed', 'completed', { priorArtCount });
     }
 
-    updateProgress('Analyzing invention features...');
+    updateProgress('Extracting technical features from codebase...');
 
     let features;
     if (hasInventionDescription) {
@@ -119,12 +121,11 @@ export async function generateCompletePatentApplication(
       };
       features = await extractFeaturesFromInvention(inventionInput);
     } else {
-      // Use features extracted from the codebase analysis
       features = await extractCodebaseFeatures(config.projectId);
     }
     updateProgress('Feature extraction completed', 'completed', { featureCount: features.features.length });
 
-    updateProgress('Performing novelty analysis...');
+    updateProgress('Analyzing patentability and novelty...');
     const noveltyAnalysis = await performNoveltyAnalysis(
       config.projectId,
       config.applicationId,
@@ -136,7 +137,7 @@ export async function generateCompletePatentApplication(
     });
 
     if (!config.skipPriorArtSearch) {
-      updateProgress('Generating differentiation reports...');
+      updateProgress('Comparing invention against prior art...');
       try {
         await generateComprehensiveDifferentiation(
           config.projectId,
@@ -149,7 +150,7 @@ export async function generateCompletePatentApplication(
       updateProgress('Differentiation analysis completed', 'completed');
     }
 
-    updateProgress('Generating intelligent specification...');
+    updateProgress('Generating specification (Field, Background, Summary, Description, Abstract)...');
     const priorArt = await getPriorArtResults(config.applicationId);
     const differentiationReports = await getDifferentiationReports(config.applicationId);
 
@@ -192,10 +193,10 @@ export async function generateCompletePatentApplication(
       })
       .eq('id', config.applicationId);
 
-    updateProgress('Specification generation completed', 'completed');
+    updateProgress('Specification generation completed', 'completed', { sections: 5 });
 
     if (config.useAIClaims) {
-      updateProgress('Generating AI-enhanced claims...');
+      updateProgress('Generating independent and dependent claims...');
       const claims = await generateAIEnhancedClaims(
         config.applicationId,
         features.features,
@@ -204,7 +205,7 @@ export async function generateCompletePatentApplication(
       updateProgress('Claims generation completed', 'completed', { claimsCount: claims.length });
     }
 
-    updateProgress('Generating patent drawings...');
+    updateProgress('Generating patent drawings from features...');
     const drawings = await generateDrawingsForApplication(config.applicationId, config.projectId);
     updateProgress('Drawings generation completed', 'completed', { drawingsCount: drawings.length });
 
