@@ -436,15 +436,20 @@ const DEFAULT_DEPENDENT_CLAIMS: DependentClaimItem[] = [
 ];
 
 function isValidDependentClaim(item: unknown): item is DependentClaimItem {
-  return (
-    typeof item === 'object' &&
-    item !== null &&
-    'claimText' in item &&
-    'parentClaimNumber' in item &&
-    typeof (item as DependentClaimItem).claimText === 'string' &&
-    typeof (item as DependentClaimItem).parentClaimNumber === 'number' &&
-    (item as DependentClaimItem).claimText.length > 30
-  );
+  if (typeof item !== 'object' || item === null) return false;
+  const obj = item as Record<string, any>;
+
+  // Accept common AI format variants: claimText/claim_text/text, parentClaimNumber/parent_claim_number/parentClaim
+  let text = obj.claimText || obj.claim_text || obj.text || '';
+  let parent = obj.parentClaimNumber ?? obj.parent_claim_number ?? obj.parentClaim ?? obj.parent;
+
+  if (typeof text === 'string' && text.length > 30 && (typeof parent === 'number' || typeof parent === 'string')) {
+    // Normalize into expected shape
+    obj.claimText = text;
+    obj.parentClaimNumber = typeof parent === 'number' ? parent : parseInt(parent, 10) || 1;
+    return true;
+  }
+  return false;
 }
 
 async function generateDependentClaims(
@@ -476,8 +481,8 @@ async function generateDependentClaims(
     },
     DEFAULT_DEPENDENT_CLAIMS,
     {
-      maxRetries: 3,
-      timeoutMs: 120000,
+      maxRetries: 2,
+      timeoutMs: 90000,
       featureArea: 'patent_claims',
       onRetry: (attempt, error) => {
         console.log(`Dependent claims generation retry ${attempt}: ${error.message}`);

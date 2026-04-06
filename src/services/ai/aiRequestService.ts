@@ -99,30 +99,61 @@ export async function makeAIRequest<T>(
 }
 
 export function parseJSONArray<T>(response: string, validator?: (item: unknown) => item is T): T[] {
-  const jsonMatch = response.match(/\[[\s\S]*\]/);
+  // Try to extract JSON array — attempt progressively less strict methods
+  let parsed: any[] | null = null;
 
-  if (!jsonMatch) {
-    throw new Error('No JSON array found in response');
+  // Method 1: Find the outermost balanced JSON array by bracket counting
+  const startIdx = response.indexOf('[');
+  if (startIdx !== -1) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let endIdx = -1;
+
+    for (let i = startIdx; i < response.length; i++) {
+      const ch = response[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\' && inString) { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '[') depth++;
+      if (ch === ']') { depth--; if (depth === 0) { endIdx = i; break; } }
+    }
+
+    if (endIdx !== -1) {
+      let jsonStr = response.substring(startIdx, endIdx + 1);
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch {
+        // Try repairing truncated JSON
+        if (!isJSONComplete(jsonStr)) {
+          jsonStr = repairTruncatedJSON(jsonStr);
+        }
+        try { parsed = JSON.parse(jsonStr); } catch { /* fall through */ }
+      }
+    }
   }
 
-  let jsonStr = jsonMatch[0];
-
-  if (!isJSONComplete(jsonStr)) {
-    jsonStr = repairTruncatedJSON(jsonStr);
+  // Method 2: Fallback — greedy regex with repair
+  if (!parsed) {
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) throw new Error('No JSON array found in response');
+    let jsonStr = jsonMatch[0];
+    if (!isJSONComplete(jsonStr)) jsonStr = repairTruncatedJSON(jsonStr);
+    parsed = JSON.parse(jsonStr);
   }
-
-  const parsed = JSON.parse(jsonStr);
 
   if (!Array.isArray(parsed)) {
     throw new Error('Parsed result is not an array');
   }
 
   if (validator) {
-    const invalidItems = parsed.filter(item => !validator(item));
-    if (invalidItems.length > 0) {
-      console.warn(`${invalidItems.length} items failed validation`);
+    const valid = parsed.filter(validator);
+    const invalid = parsed.length - valid.length;
+    if (invalid > 0) {
+      console.warn(`${invalid} of ${parsed.length} items failed validation`);
     }
-    return parsed.filter(validator);
+    return valid;
   }
 
   return parsed;
