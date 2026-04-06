@@ -81,6 +81,13 @@ NOVELTY ASSESSMENT:
 INVENTION CONTEXT:
 \${inventionDescription}
 
+CRITICAL GROUNDING RULES:
+- Claims MUST ONLY cover functionality that is evidenced by the features listed above.
+- Do NOT claim capabilities, components, or algorithms not described in the provided features.
+- Every element in each claim must correspond to a named feature or a specific technical detail from the features list.
+- Do NOT use generic technical jargon (e.g., "machine learning model", "neural network", "blockchain") unless those terms appear in the features or invention context.
+- If the features are insufficient to support a particular claim type, omit that claim type rather than inventing functionality.
+
 Generate 3-5 independent claims covering:
 1. A METHOD claim for the core process
 2. A SYSTEM claim for the apparatus/architecture
@@ -112,9 +119,14 @@ INDEPENDENT CLAIMS:
 AVAILABLE FEATURES FOR LIMITATIONS:
 \${features}
 
+CRITICAL GROUNDING RULES:
+- Each dependent claim MUST add a limitation that corresponds to a specific feature from the list above.
+- Do NOT introduce components, algorithms, or capabilities not evidenced in the features.
+- If there are not enough distinct features to support 8 claims, generate fewer claims rather than inventing limitations.
+
 Generate 8-15 dependent claims that:
 1. Reference specific independent claims
-2. Add meaningful technical limitations
+2. Add meaningful technical limitations drawn from the features above
 3. Cover different aspects of the invention
 4. Create a claim tree with varying scope
 

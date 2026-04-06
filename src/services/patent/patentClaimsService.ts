@@ -155,7 +155,7 @@ async function generateIndependentClaims(
     title: title || 'Invention',
     features: featuresText,
     noveltyAnalysis: noveltyAnalysis.patentabilityAssessment || '',
-    inventionDescription: `${inventionDescription || ''}\n\nIMPORTANT: Claims must ONLY cover functionality evidenced by the features listed above. Do not claim capabilities not described in the provided features.`
+    inventionDescription: inventionDescription || ''
   });
 
   const result = await makeAIRequest<string[]>(

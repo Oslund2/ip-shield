@@ -5,13 +5,17 @@ import { getLanguageBreakdown } from './codebaseIngestionService';
 
 const BATCH_SIZE = 8;
 
-function createBatchPrompt(files: CodeFile[], batchIndex: number): string {
+function createBatchPrompt(files: CodeFile[], batchIndex: number, readmeContent?: string): string {
   const fileContents = files.map(f =>
     `--- FILE: ${f.path} (${f.language}, ${f.lineCount} lines) ---\n${f.content.substring(0, 8000)}\n`
   ).join('\n');
 
-  return `You are a patent attorney and software architect analyzing source code to identify patentable intellectual property.
+  const readmeSection = readmeContent
+    ? `\n--- PROJECT README (authoritative description of what this software does — use this to understand context) ---\n${readmeContent}\n--- END README ---\n`
+    : '';
 
+  return `You are a patent attorney and software architect analyzing source code to identify patentable intellectual property.
+${readmeSection}
 Analyze these source code files (batch ${batchIndex + 1}) and identify novel, potentially patentable features.
 
 For each feature found, provide:
@@ -23,6 +27,12 @@ For each feature found, provide:
 6. **novelty_strength**: "strong", "moderate", or "weak" — how novel is this compared to known solutions?
 7. **is_core_innovation**: true if this is a central innovation, false if supplementary
 
+NOVELTY RATING GUIDANCE:
+- "strong": The approach is clearly non-obvious and would not be a standard solution a skilled practitioner would reach for. Reserve this rating — most features are NOT strong.
+- "moderate": The feature has some interesting aspects but uses generally known techniques in a somewhat novel combination.
+- "weak": The feature uses well-known patterns, standard libraries, or common architectural approaches. When in doubt, use this rating.
+- Most CRUD apps, standard API wrappers, common UI patterns, and well-known architectural patterns (MVC, pub-sub, middleware chains) should score "weak" unless there is a genuinely novel twist.
+
 Focus on:
 - Novel algorithms or methods
 - Unique data structures or processing pipelines
@@ -31,7 +41,7 @@ Focus on:
 - Optimization techniques
 - Security mechanisms
 
-Do NOT flag standard patterns (REST APIs, CRUD operations, basic auth) unless they have a genuinely novel twist.
+Do NOT flag standard patterns (REST APIs, CRUD operations, basic auth, standard ORM usage, conventional state management) unless they have a genuinely novel twist.
 
 Respond in valid JSON format:
 {
@@ -102,6 +112,7 @@ export async function analyzeCodebase(
   projectId: string,
   files: CodeFile[],
   onProgress?: (progress: AnalysisProgress) => void,
+  readmeContent?: string,
 ): Promise<AnalysisResult> {
   const languageBreakdown = getLanguageBreakdown(files);
   const batches = createBatches(files);
@@ -126,7 +137,7 @@ export async function analyzeCodebase(
     });
 
     try {
-      const prompt = createBatchPrompt(batch, i);
+      const prompt = createBatchPrompt(batch, i, readmeContent);
       const response = await generateText(prompt, 'codebase_analysis', {
         maxTokens: 3000,
         temperature: 0.2,

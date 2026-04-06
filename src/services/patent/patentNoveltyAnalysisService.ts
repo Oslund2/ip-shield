@@ -142,10 +142,35 @@ export async function performNoveltyAnalysis(
     features.features
   );
 
+  // Load invention description from patent application + project README for grounding
+  let inventionDescription = '';
+  try {
+    const { data: app } = await (supabase as any)
+      .from('patent_applications')
+      .select('title, invention_description, detailed_description')
+      .eq('id', patentApplicationId)
+      .maybeSingle();
+    if (app?.invention_description) inventionDescription = app.invention_description;
+    else if (app?.detailed_description) inventionDescription = app.detailed_description;
+
+    const { data: project } = await (supabase as any)
+      .from('projects')
+      .select('source_metadata, analysis_summary')
+      .eq('id', projectId)
+      .maybeSingle();
+    if (project?.source_metadata?.readmeContent) {
+      inventionDescription += `\n\n--- PROJECT README ---\n${project.source_metadata.readmeContent}\n--- END README ---`;
+    }
+    if (project?.analysis_summary) {
+      inventionDescription += `\n\nAnalysis Summary: ${project.analysis_summary}`;
+    }
+  } catch { /* continue with whatever we have */ }
+
   const aiAssessment = await generateAINoveltyAssessment(
     features.features,
     priorArt,
-    projectId
+    projectId,
+    inventionDescription
   );
 
   const overallScore = calculateNoveltyScore(features.features, priorArt);
@@ -178,7 +203,8 @@ export async function performNoveltyAnalysis(
 async function generateAINoveltyAssessment(
   features: any[],
   priorArt: any[],
-  _projectId: string
+  _projectId: string,
+  inventionDescription: string = ''
 ): Promise<any> {
   const featuresText = features.map((f, i) => `${i + 1}. ${f.name} (${f.noveltyStrength} novelty)
    Description: ${f.description}
@@ -197,7 +223,7 @@ async function generateAINoveltyAssessment(
       title: 'Patent Novelty Analysis',
       features: featuresText,
       priorArt: priorArtText,
-      inventionDescription: ''
+      inventionDescription: inventionDescription || 'No invention description available.'
     });
 
     const response = await generateText(prompt, 'patent_novelty_analysis');
@@ -212,58 +238,80 @@ async function generateAINoveltyAssessment(
 
   return {
     strengths: [
-      'Multiple novel algorithmic implementations',
-      'Unique combination of features not found in prior art',
-      'Clear commercial utility and practical application',
-      'Technical depth with specific implementations'
+      'Technical implementation details are present in the codebase',
+      'Features were extracted from actual source code'
     ],
     weaknesses: [
-      'Some features may be considered obvious improvements',
-      'Need to emphasize unexpected results in specification'
+      'AI-powered novelty assessment could not be completed — manual review is required',
+      'Prior art comparison may be incomplete',
+      'Novelty ratings are preliminary and have not been validated against patent databases'
     ],
     recommendations: [
-      'Emphasize core algorithmic innovations as primary novelty',
-      'Include specific performance metrics and efficiency data',
-      'Add flowcharts showing system architecture',
-      'Provide detailed examples of technical implementations',
-      'Quantify improvements over traditional methods'
+      'Conduct a manual prior art search using USPTO PatFT/AppFT or Google Patents',
+      'Consult a patent attorney to validate novelty claims before filing',
+      'Review each extracted feature against known solutions in the technical domain',
+      'Add specific performance metrics and benchmarks to strengthen the application',
+      'Ensure the README clearly describes what makes this software different from existing solutions'
     ],
-    assessment: 'This invention demonstrates strong patentability based on multiple novel features working in combination. The system architecture, analysis algorithms, and integrated workflow represent significant technical advancements over existing methods. While some individual features may have prior art, the specific combination and implementation approach is unique. Recommend proceeding with application, emphasizing the synergistic effects of combined features and quantifiable improvements in efficiency.'
+    assessment: 'Automated novelty assessment could not be completed. The extracted features require manual review by a qualified patent professional to determine patentability. The novelty scores shown are preliminary estimates based on code analysis only and have not been validated against prior art databases.'
   };
 }
 
 function calculateNoveltyScore(features: any[], priorArt: any[]): number {
-  let score = 50;
+  const priorArtSearched = priorArt.length > 0;
+
+  // Start with a conservative base — novelty must be earned
+  let score = 30;
 
   const strongFeatures = features.filter(f => f.noveltyStrength === 'strong').length;
   const moderateFeatures = features.filter(f => f.noveltyStrength === 'moderate').length;
+  const weakFeatures = features.filter(f => f.noveltyStrength === 'weak').length;
   const coreInnovations = features.filter(f => f.isCoreInnovation).length;
 
-  score += strongFeatures * 8;
-  score += moderateFeatures * 4;
-  score += coreInnovations * 5;
+  // Feature contributions (reduced from original to avoid inflation)
+  score += strongFeatures * 6;
+  score += moderateFeatures * 3;
+  score += coreInnovations * 4;
 
-  const highRelevancePriorArt = priorArt.filter(pa => pa.relevance_score >= 80).length;
-  const blockingPriorArt = priorArt.filter(pa => pa.is_blocking).length;
+  // Weak features slightly reduce confidence (lots of weak = probably not novel)
+  score -= weakFeatures * 1;
 
-  score -= highRelevancePriorArt * 5;
-  score -= blockingPriorArt * 15;
+  // Prior art adjustments
+  if (priorArtSearched) {
+    const highRelevancePriorArt = priorArt.filter(pa => pa.relevance_score >= 80 || pa.relevance_score >= 0.8).length;
+    const blockingPriorArt = priorArt.filter(pa => pa.is_blocking).length;
+    const lowRelevancePriorArt = priorArt.filter(pa => (pa.relevance_score < 40 || pa.relevance_score < 0.4) && !pa.is_blocking).length;
+
+    score -= highRelevancePriorArt * 7;
+    score -= blockingPriorArt * 15;
+    // If prior art was searched and nothing highly relevant was found, that's a positive signal
+    score += lowRelevancePriorArt > 0 ? 5 : 0;
+  } else {
+    // No prior art search was performed — cap the score as preliminary
+    score = Math.min(score, 50);
+  }
 
   return Math.min(Math.max(score, 0), 100);
 }
 
 function calculateApprovalProbability(noveltyScore: number, assessment: any): number {
-  let probability = noveltyScore * 0.7;
+  // Approval probability should be conservative — patent approval is never guaranteed
+  let probability = noveltyScore * 0.6;
 
-  if (assessment.strengths.length >= 4) {
-    probability += 10;
+  // Only boost if assessment has substantive strengths (not fallback boilerplate)
+  const hasSubstantiveStrengths = assessment.strengths?.some(
+    (s: string) => s.length > 60 && !s.includes('could not be completed')
+  );
+  if (hasSubstantiveStrengths && assessment.strengths.length >= 3) {
+    probability += 8;
   }
 
-  if (assessment.weaknesses.length <= 2) {
-    probability += 5;
+  // More weaknesses = lower probability
+  if (assessment.weaknesses.length >= 3) {
+    probability -= 5;
   }
 
-  return Math.min(Math.max(probability, 0), 100);
+  return Math.min(Math.max(Math.round(probability), 0), 100);
 }
 
 function calculateFeatureScores(features: any[]): Record<string, number> {

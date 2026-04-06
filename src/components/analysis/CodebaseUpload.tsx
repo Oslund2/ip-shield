@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { GitFork, Loader2, ArrowRight, AlertCircle, X, CheckCircle, Code, Search, Sparkles, FileText, Shield, Clock } from 'lucide-react';
+import { GitFork, Loader2, ArrowRight, AlertCircle, X, CheckCircle, Code, Search, Sparkles, FileText, Shield, Clock, Info, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProject } from '../../contexts/ProjectContext';
 import { ingestFromGitHub, getLanguageBreakdown } from '../../services/analysis/codebaseIngestionService';
@@ -24,6 +24,7 @@ const STEP_CONFIG = [
 export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
   const { user, session } = useAuth();
   const { createProject, updateProject } = useProject();
+  const [showTips, setShowTips] = useState(false);
   const [repoUrl, setRepoUrl] = useState('');
   const [inventorName, setInventorName] = useState('');
   const [entityStatus, setEntityStatus] = useState<'micro_entity' | 'small_entity' | 'regular'>('micro_entity');
@@ -34,6 +35,7 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
   const [error, setError] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [metrics, setMetrics] = useState<Record<string, string>>({});
+  const [warnings, setWarnings] = useState<string[]>([]);
   const startRef = useRef(0);
 
   useEffect(() => {
@@ -51,6 +53,7 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
   const handleGitHubAnalysis = async () => {
     if (!repoUrl.trim() || !user) return;
     setError('');
+    setWarnings([]);
     setLoading(true);
     setProgress({ step: 'fetching', progress: 0, message: 'Fetching repository...' });
 
@@ -79,6 +82,13 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
         },
       });
 
+      // Check README quality and warn user
+      if (!readmeContent || readmeContent.trim().length === 0) {
+        setWarnings(prev => [...prev, 'No README found — patent output quality will be significantly reduced. Consider adding a detailed README to your repo.']);
+      } else if (readmeContent.trim().length < 200) {
+        setWarnings(prev => [...prev, 'README is very short — the tool works best with a detailed README that describes what the software does and what makes it novel.']);
+      }
+
       // Store file records
       setProgress({ step: 'parsing', progress: 8, message: `Parsing ${files.length} files...` });
       getLanguageBreakdown(files); // compute for analysis engine
@@ -97,7 +107,7 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
       }
 
       setProgress({ step: 'analyzing', progress: 10, message: 'Starting AI analysis...' });
-      await analyzeCodebase(project.id, files, setProgress);
+      await analyzeCodebase(project.id, files, setProgress, readmeContent || undefined);
 
       // Auto-generate all IP applications
       setProgress({ step: 'generating_patents', progress: 55, message: 'Generating patent applications...' });
@@ -131,6 +141,14 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
         }
       }, applicant);
 
+      // Check if prior art search produced results — warn if not
+      setMetrics(prev => {
+        if (!prev.priorArt || prev.priorArt === '0 prior art') {
+          setWarnings(w => [...w, 'Prior art search returned no results — novelty scores are preliminary only. Verify prior art manually before filing.']);
+        }
+        return prev;
+      });
+
       setProgress({
         step: 'complete', progress: 100,
         message: 'IP analysis complete! Patents, copyrights, and trademarks generated.',
@@ -156,6 +174,54 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
         <p className="text-base text-gray-500 mt-3 max-w-lg mx-auto">
           Point to a GitHub repository to discover patentable intellectual property
         </p>
+      </div>
+
+      {/* Tips for Best Results */}
+      <div className="max-w-2xl mx-auto mb-6">
+        <button
+          type="button"
+          onClick={() => setShowTips(!showTips)}
+          className="w-full flex items-center justify-between px-5 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm font-medium text-amber-800 hover:bg-amber-100 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Info className="w-4 h-4" />
+            Tips for Best Results
+          </span>
+          {showTips ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        {showTips && (
+          <div className="mt-2 bg-amber-50/50 border border-amber-100 rounded-xl p-5 space-y-3 text-sm text-amber-900">
+            <div className="flex gap-3">
+              <BookOpen className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold mb-1">Your README is the #1 input</p>
+                <p className="text-amber-700">The tool uses your README as the authoritative description of what your software does. Write it like an invention disclosure: what problem it solves, what makes the approach novel, and how the key components work. A thin or missing README will produce generic, low-quality patent output.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <GitFork className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold mb-1">Repository access</p>
+                <p className="text-amber-700">Public repos work immediately. For private repos, sign in with GitHub (top-right) to grant read access. The tool uses the GitHub API — it does not clone your repo.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Code className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold mb-1">What gets analyzed</p>
+                <p className="text-amber-700">The tool prioritizes the <strong>top 40 source code files</strong> (TypeScript, JavaScript, Python, Rust, Go, Java, C#, C++, Swift, Kotlin, and 30+ more). Config files, docs, and binaries are skipped. If your innovation lives in a specific directory, describe it in your README so the AI has context.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold mb-1">Novelty scores are preliminary</p>
+                <p className="text-amber-700">The tool searches Google Patents for prior art, but automated scores should not replace professional patent counsel. Use the generated documents as a strong starting point, then review with an attorney before filing.</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* GitHub input */}
@@ -323,6 +389,18 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
           {progress.detail && (
             <p className="text-xs text-gray-400 mt-2 truncate">{progress.detail}</p>
           )}
+        </div>
+      )}
+
+      {/* Warnings */}
+      {warnings.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {warnings.map((w, i) => (
+            <div key={i} className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+              <p className="text-amber-800 text-sm">{w}</p>
+            </div>
+          ))}
         </div>
       )}
 

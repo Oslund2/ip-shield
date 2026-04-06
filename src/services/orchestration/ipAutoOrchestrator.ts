@@ -56,7 +56,8 @@ function parseJsonFromResponse<T>(response: string): T | null {
 // ---------------------------------------------------------------------------
 
 async function clusterFeatures(
-  features: ExtractedFeature[]
+  features: ExtractedFeature[],
+  readmeContent?: string
 ): Promise<InnovationCluster[]> {
   // If 3 or fewer features, bundle them into one cluster (skip AI call)
   if (features.length <= 3) {
@@ -74,8 +75,12 @@ async function clusterFeatures(
     .map((f, i) => `${i + 1}. ${f.name} (${f.type}) — ${f.description}`)
     .join('\n');
 
-  const prompt = `You are an IP strategist. Given the following extracted software features, group them into 1-3 patentable innovation clusters. Each cluster should combine closely related features that together form a single patentable invention.
+  const readmeSection = readmeContent
+    ? `\nPROJECT README (use this to understand what the software actually does and name clusters accordingly):\n${readmeContent.substring(0, 3000)}\n`
+    : '';
 
+  const prompt = `You are an IP strategist. Given the following extracted software features, group them into 1-3 patentable innovation clusters. Each cluster should combine closely related features that together form a single patentable invention.
+${readmeSection}
 FEATURES:
 ${featureList}
 
@@ -314,6 +319,21 @@ export async function runFullIPAnalysis(
   };
 
   // -----------------------------------------------------------------------
+  // 0. Load project README for grounding (used across multiple phases)
+  // -----------------------------------------------------------------------
+  let readmeContent = '';
+  try {
+    const { data: projectData } = await (supabase as any)
+      .from('projects')
+      .select('source_metadata, analysis_summary')
+      .eq('id', projectId)
+      .maybeSingle();
+    if (projectData?.source_metadata?.readmeContent) {
+      readmeContent = projectData.source_metadata.readmeContent;
+    }
+  } catch { /* continue without README */ }
+
+  // -----------------------------------------------------------------------
   // 1. Cluster features (0-10%)
   // -----------------------------------------------------------------------
   let features: ExtractedFeature[] = [];
@@ -333,7 +353,7 @@ export async function runFullIPAnalysis(
 
     reportProgress(onProgress, 'clustering', `Found ${features.length} features. Clustering into inventions...`, 5);
 
-    clusters = await clusterFeatures(features);
+    clusters = await clusterFeatures(features, readmeContent || undefined);
     result.clusterCount = clusters.length;
 
     reportProgress(
@@ -351,21 +371,6 @@ export async function runFullIPAnalysis(
     reportProgress(onProgress, 'complete', 'Clustering failed', 100);
     return result;
   }
-
-  // -----------------------------------------------------------------------
-  // 1b. Load project README for grounding patent generation
-  // -----------------------------------------------------------------------
-  let readmeContent = '';
-  try {
-    const { data: projectData } = await (supabase as any)
-      .from('projects')
-      .select('source_metadata, analysis_summary')
-      .eq('id', projectId)
-      .maybeSingle();
-    if (projectData?.source_metadata?.readmeContent) {
-      readmeContent = projectData.source_metadata.readmeContent;
-    }
-  } catch { /* continue without README */ }
 
   // -----------------------------------------------------------------------
   // 2. Generate patents (10-70%)
