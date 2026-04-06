@@ -177,17 +177,28 @@ async function generateIndependentClaims(
   inventionDescription?: string
 ): Promise<string[]> {
   const coreFeatures = features.filter(f => f.is_core_innovation);
+  const featureList = coreFeatures.length > 0 ? coreFeatures : features.slice(0, 10);
 
-  const featuresText = coreFeatures.map((f, i) => `${i + 1}. ${f.feature_name}
-   Type: ${f.feature_type}
-   Description: ${f.technical_description}
-   Novelty: ${f.novelty_strength}`).join('\n\n');
+  const featuresText = featureList.map((f, i) => {
+    const name = f.feature_name || f.name || 'Feature';
+    const type = f.feature_type || f.type || 'component';
+    const desc = f.technical_description || f.technicalDetails || f.description || '';
+    const novelty = f.novelty_strength || f.noveltyStrength || 'moderate';
+    const source = f.source_file_path || f.sourceFile || '';
+    const snippet = f.code_snippet || f.codeSnippet || '';
+
+    let text = `${i + 1}. ${name} (${type}, ${novelty} novelty)`;
+    if (desc) text += `\n   Description: ${desc}`;
+    if (source) text += `\n   Source: ${source}`;
+    if (snippet) text += `\n   Code: ${snippet.substring(0, 300)}`;
+    return text;
+  }).join('\n\n');
 
   const prompt = await getPatentClaimsIndependentPrompt(projectId, {
     title: title || 'Invention',
     features: featuresText,
     noveltyAnalysis: noveltyAnalysis.patentabilityAssessment || '',
-    inventionDescription: inventionDescription || ''
+    inventionDescription: `${inventionDescription || ''}\n\nIMPORTANT: Claims must ONLY cover functionality evidenced by the features listed above. Do not claim capabilities not described in the provided features.`
   });
 
   const result = await makeAIRequest<string[]>(

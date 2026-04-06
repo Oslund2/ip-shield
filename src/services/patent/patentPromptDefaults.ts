@@ -235,6 +235,8 @@ INVENTION DESCRIPTION:
 PROBLEM SOLVED:
 \${problemSolved}
 
+GROUNDING CONSTRAINT: Every technical claim in this summary MUST correspond to a specific feature listed above. Do NOT describe capabilities not represented in the provided features. Reference features by their actual names.
+
 Generate a summary section with this structure:
 
 **PARAGRAPH 1: Overview Statement**
@@ -297,6 +299,8 @@ INVENTION CONTEXT:
 
 TECHNICAL FIELD:
 \${technicalField}
+
+GROUNDING RULE (CRITICAL): Each paragraph should reference specific features from the list above by name. Do NOT invent system components, modules, or algorithms not present in the feature list. If the features don't provide enough detail, write a shorter but accurate section rather than a longer hallucinated one.
 
 REFERENCE NUMBER RULES (CRITICAL - READ CAREFULLY):
 The invention description above contains a list of VALID reference numerals from the patent drawings.

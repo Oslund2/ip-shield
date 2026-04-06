@@ -1,6 +1,42 @@
 import { generateText } from '../ai/geminiService';
+import { supabase } from '../../lib/supabase';
 
 // Inline prompt builders for patent specification sections
+
+const GROUNDING_RULE = `
+CRITICAL GROUNDING RULE: You MUST only describe functionality that is directly evidenced by the features and code provided above.
+- Do NOT invent components, modules, algorithms, or data structures not listed in the features.
+- Do NOT add reference numerals (e.g., "module 100", "engine 200").
+- Do NOT elaborate beyond what the feature descriptions and code snippets support.
+- If a feature lacks detail, describe it briefly and move on — do NOT fill gaps with speculation.
+- Every technical claim MUST correspond to a named feature from the list above.
+`;
+
+/** Format features with full technical details and code snippets for grounding */
+function formatFeaturesRich(features: any[], maxFeatures?: number): string {
+  const list = maxFeatures ? features.slice(0, maxFeatures) : features;
+  return list.map((f, i) => {
+    const name = f.name || f.feature_name || 'Feature';
+    const type = f.type || f.feature_type || 'component';
+    const novelty = f.noveltyStrength || f.novelty_strength || 'moderate';
+    const source = f.sourceFile || f.source_file_path || '';
+    const desc = f.description || '';
+    const details = f.technicalDetails || f.technical_description || f.description || '';
+    const snippet = f.codeSnippet || f.code_snippet || '';
+
+    let text = `${i + 1}. ${name}\n   Type: ${type} | Novelty: ${novelty}`;
+    if (source) text += `\n   Source File: ${source}`;
+    if (desc) text += `\n   Description: ${desc}`;
+    if (details && details !== desc) text += `\n   Technical Details: ${details}`;
+    if (snippet) text += `\n   Code:\n   \`\`\`\n   ${snippet.substring(0, 400)}\n   \`\`\``;
+    return text;
+  }).join('\n\n');
+}
+
+/** Format features as brief list (for Field of Invention where detail isn't needed) */
+function formatFeaturesBrief(features: any[]): string {
+  return features.map(f => `• ${f.name || f.feature_name} (${f.type || f.feature_type || 'component'})`).join('\n');
+}
 
 function buildFieldOfInventionPrompt(vars: {
   title: string;
@@ -18,10 +54,11 @@ KEY FEATURES:
 ${vars.features}
 
 Write a concise "Field of the Invention" section (1-2 paragraphs) that:
-1. Identifies the general technical field
+1. Identifies the general technical field based on the features above
 2. Narrows to the specific area of the invention
 3. Uses formal patent language ("The present invention relates to...")
 4. Does NOT include specific details of the invention itself
+5. Derives the field ENTIRELY from the provided features — do NOT assume a domain
 
 Write ONLY the section text, no headings or labels.`;
 }
@@ -74,10 +111,11 @@ ${vars.differentiationPoints}
 
 Write a "Summary of the Invention" section (3-5 paragraphs) that:
 1. Begins with "The present invention provides..." or similar
-2. Broadly describes the invention and its key aspects
-3. Highlights the technical advantages
-4. Mentions different embodiments if applicable
-5. Uses formal patent language
+2. Describes the invention by referencing the SPECIFIC FEATURES listed above by name
+3. Highlights the technical advantages evidenced in the features
+4. Uses formal patent language
+
+${GROUNDING_RULE}
 
 Write ONLY the section text, no headings or labels.`;
 }
@@ -90,26 +128,22 @@ function buildDetailedDescriptionPrompt(vars: {
   technicalField: string;
 }): string {
   const sectionInstructions: Record<string, string> = {
-    overview: `Write an OVERVIEW subsection that:
-1. Introduces the overall system architecture
-2. Describes how components interact at a high level
-3. Explains the general operating principles
-4. References specific technical elements`,
-    components: `Write a COMPONENTS subsection that:
-1. Describes each system component in detail
-2. Explains inputs, outputs, and data flows
-3. Specifies technical implementations
-4. Uses reference numerals where appropriate`,
-    algorithms: `Write an ALGORITHMS subsection that:
-1. Describes core algorithms and methods step-by-step
-2. Includes specific data structures used
-3. Explains decision logic and processing flows
-4. Provides enough detail for a person skilled in the art to reproduce`,
-    embodiments: `Write an ALTERNATIVE EMBODIMENTS subsection that:
-1. Describes at least 2-3 alternative implementations
-2. Explains how embodiments differ from the preferred one
-3. Covers different deployment scenarios
-4. Broadens the scope of protection`
+    overview: `Write an OVERVIEW subsection (2-3 paragraphs) that:
+1. Introduces the overall system by listing the actual features/components above
+2. Describes at a high level how these features work together
+3. References features BY NAME from the list above`,
+    components: `Write a COMPONENTS subsection that describes each feature listed above:
+1. For each feature, write 1-2 paragraphs based on its description and technical details
+2. If code snippets are provided, reference the actual implementation approach shown in the code
+3. Do NOT invent inputs/outputs/data flows not described in the features`,
+    algorithms: `Write an ALGORITHMS AND METHODS subsection that:
+1. Describes the algorithms and methods evidenced in the features above
+2. Reference actual code patterns shown in the code snippets
+3. If a feature's technical details mention specific algorithms, describe those
+4. Do NOT invent algorithms not mentioned in the features`,
+    embodiments: `Write a DEPLOYMENT VARIATIONS subsection (1-2 paragraphs) that:
+1. Notes that the features described above could be deployed in web, mobile, or cloud configurations
+2. Keep this brief — do NOT invent detailed alternative architectures`
   };
 
   return `You are a patent attorney drafting a Detailed Description of the Invention section for a US patent application.
@@ -119,13 +153,14 @@ INVENTION TITLE: ${vars.title}
 TECHNICAL FIELD: ${vars.technicalField}
 INVENTION DESCRIPTION: ${vars.inventionDescription}
 
-FEATURES:
+FEATURES (from actual codebase analysis):
 ${vars.features}
 
 ${sectionInstructions[vars.sectionType] || sectionInstructions.overview}
 
-Use formal patent language. Be technically precise and detailed.
-Write ONLY the section text, no headings or labels.`;
+${GROUNDING_RULE}
+
+Use formal patent language. Write ONLY the section text, no headings or labels.`;
 }
 
 function buildAbstractPrompt(vars: {
@@ -143,10 +178,11 @@ ${vars.features}
 
 Write a patent Abstract (150 words or fewer) that:
 1. Begins with a statement of the technical field
-2. Concisely describes the invention's key aspects
+2. Concisely describes the invention by referencing the specific features listed above
 3. Highlights the primary technical advantage
 4. Uses formal patent language
 5. Does NOT use phrases like "This abstract..." or "The abstract..."
+6. Every component or capability mentioned MUST correspond to an actual feature listed above
 
 Write ONLY the abstract text.`;
 }
@@ -329,6 +365,31 @@ export async function generateIntelligentSpecification(
   projectId?: string | null,
   drawings?: PatentDrawingData[]
 ): Promise<SpecificationSections> {
+  // Load project context (analysis summary, source URL) for grounding
+  let projectContext = '';
+  if (projectId) {
+    try {
+      const { data: project } = await (supabase as any)
+        .from('projects')
+        .select('name, source_url, analysis_summary')
+        .eq('id', projectId)
+        .maybeSingle();
+      if (project) {
+        const parts: string[] = [];
+        if (project.name) parts.push(`Project: ${project.name}`);
+        if (project.source_url) parts.push(`Source: ${project.source_url}`);
+        if (project.analysis_summary) parts.push(`Analysis Summary: ${project.analysis_summary}`);
+        projectContext = parts.join('\n');
+      }
+    } catch { /* continue without project context */ }
+  }
+
+  // Enrich invention context with project info
+  const enrichedContext: InventionContext = {
+    ...inventionContext,
+    description: [inventionContext?.description, projectContext].filter(Boolean).join('\n\n')
+  };
+
   const referenceContext = drawings && drawings.length > 0
     ? buildReferenceNumberContext(drawings)
     : null;
@@ -337,11 +398,11 @@ export async function generateIntelligentSpecification(
     ? generateBriefDescriptionOfDrawings(drawings)
     : '';
 
-  const field = await generateFieldSection(title, features, inventionContext, projectId, referenceContext);
-  const background = await generateBackgroundSection(priorArt, differentiationReports, inventionContext, projectId, referenceContext);
-  const summary = await generateSummarySection(title, features, differentiationReports, inventionContext, projectId, referenceContext);
-  const detailedDescription = await generateDetailedDescriptionSection(title, features, inventionContext, projectId, referenceContext, drawings);
-  const abstract = await generateAbstractSection(title, features, inventionContext, projectId);
+  const field = await generateFieldSection(title, features, enrichedContext, projectId, referenceContext);
+  const background = await generateBackgroundSection(priorArt, differentiationReports, enrichedContext, projectId, referenceContext);
+  const summary = await generateSummarySection(title, features, differentiationReports, enrichedContext, projectId, referenceContext);
+  const detailedDescription = await generateDetailedDescriptionSection(title, features, enrichedContext, projectId, referenceContext, drawings);
+  const abstract = await generateAbstractSection(title, features, enrichedContext, projectId);
 
   return {
     field,
@@ -360,9 +421,7 @@ async function generateFieldSection(
   _projectId?: string | null,
   referenceContext?: string | null
 ): Promise<string> {
-  const featuresText = features
-    .map(f => `• ${f.name || f.feature_name}: ${f.type || f.feature_type}`)
-    .join('\n');
+  const featuresText = formatFeaturesBrief(features);
 
   try {
     let promptVars = {
@@ -440,9 +499,8 @@ async function generateSummarySection(
   const advantages = differentiationReports.flatMap(dr => dr.technical_advantages || []);
 
   const featuresText = coreFeatures.length > 0
-    ? coreFeatures.map(f => `• ${f.name || f.feature_name}
-   Technical Details: ${f.technicalDetails || f.technical_description || f.description || 'Core component'}`).join('\n\n')
-    : features.slice(0, 5).map(f => `• ${f.name || f.feature_name}: ${f.technicalDetails || f.technical_description || f.description || 'Component'}`).join('\n');
+    ? formatFeaturesRich(coreFeatures)
+    : formatFeaturesRich(features, 8);
 
   const differentiationText = advantages.length > 0
     ? advantages.map((adv, i) => `${i + 1}. ${adv}`).join('\n')
@@ -481,13 +539,12 @@ async function generateDetailedDescriptionChunk(
   const coreFeatures = features.filter(f => f.isCoreInnovation || f.is_core_innovation);
 
   const featuresText = chunkType === 'algorithms'
-    ? coreFeatures.map(f => `• ${f.name || f.feature_name}
-   Technical: ${f.technicalDetails || f.technical_description || f.description || 'Algorithm component'}`).join('\n\n')
+    ? formatFeaturesRich(coreFeatures.length > 0 ? coreFeatures : features.filter(f => (f.type || f.feature_type) === 'algorithm'))
     : chunkType === 'components'
-    ? features.map(f => `• ${f.name || f.feature_name} (${f.type || f.feature_type || 'component'})
-   Description: ${f.technicalDetails || f.technical_description || f.description || 'N/A'}
-   Novelty: ${f.noveltyStrength || f.novelty_strength || 'standard'}`).join('\n\n')
-    : features.slice(0, 6).map(f => `• ${f.name || f.feature_name}: ${f.technicalDetails || f.technical_description || f.description || 'System component'}`).join('\n');
+    ? formatFeaturesRich(features)
+    : chunkType === 'embodiments'
+    ? formatFeaturesBrief(features)
+    : formatFeaturesRich(features, 8);
 
   try {
     let promptVars = {
@@ -554,8 +611,8 @@ async function generateAbstractSection(
   const coreFeatures = features.filter(f => f.isCoreInnovation || f.is_core_innovation).slice(0, 3);
 
   const featuresText = coreFeatures.length > 0
-    ? coreFeatures.map(f => `- ${f.name || f.feature_name}: ${f.technicalDetails || f.technical_description || f.description}`).join('\n')
-    : features.slice(0, 3).map(f => `- ${f.name || f.feature_name}: ${f.technicalDetails || f.technical_description || f.description || 'Component'}`).join('\n');
+    ? formatFeaturesRich(coreFeatures, 5)
+    : formatFeaturesRich(features, 5);
 
   try {
     const prompt = buildAbstractPrompt({
