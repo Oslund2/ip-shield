@@ -1,53 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { generateText } from '../ai/geminiService';
-
-// Inline prompt builder for prior art search
-function buildPriorArtSearchPrompt(vars: {
-  title: string;
-  inventionDescription: string;
-  features: string;
-  analysisTarget: string;
-}): string {
-  return `You are a patent examiner conducting a prior art search. Find REAL, EXISTING patents relevant to the following invention.
-
-CRITICAL: Cite REAL patent numbers that actually exist and can be verified on Google Patents (patents.google.com). Do NOT fabricate patent numbers.
-
-INVENTION TITLE: ${vars.title}
-
-INVENTION DESCRIPTION: ${vars.inventionDescription}
-
-KEY TECHNICAL FEATURES:
-${vars.features}
-
-ANALYSIS FOCUS: ${vars.analysisTarget}
-
-Search for patents in these categories:
-1. Patents with similar technical approaches (direct competitors)
-2. Patents that solve the same problem differently (alternative approaches)
-3. Patents whose claims could potentially block this invention
-4. Foundational patents in this technical domain
-
-For each patent found, provide a JSON array with these fields:
-- patentNumber: The actual US patent number (e.g., "US-11556757-B2" or "US2023/0050123A1")
-- title: The exact patent title
-- abstract: A 2-3 sentence summary of the patent
-- filingDate: Filing date if known (YYYY-MM-DD format)
-- assignee: The patent assignee/owner
-- inventors: Array of inventor names
-- url: Direct Google Patents URL
-- relevanceScore: 0-100, how relevant to THIS specific invention
-- technicalSimilarityScore: 0-100, how technically similar the approach is
-- similarityExplanation: 2-3 sentences explaining similarity AND key differences
-- relationshipType: One of "similar", "improvement", "different_approach", "unrelated"
-- isBlocking: Boolean, could this patent's claims block the invention?
-- threatenedClaims: Array of claim numbers (integers) from THIS invention that overlap
-- claimOverlapAnalysis: Brief explanation of overlap
-
-Return 10 patents as a JSON array. Prioritize patents with high relevance scores.
-Focus on US patents from the last 10 years.
-
-Respond with ONLY the JSON array, no other text.`;
-}
+import { fetchRealPatents, type SerperPatentResult } from './patentSearchApi';
 
 export interface PriorArtSearchParams {
   title: string;
@@ -102,151 +55,128 @@ export async function searchPriorArt(
   return results;
 }
 
-async function searchGooglePatents(params: PriorArtSearchParams, projectId: string): Promise<PriorArtResult[]> {
-  const focusAreas = getFocusAreas(params.analysisTarget);
+/**
+ * Two-phase prior art search:
+ * Phase A — Real search via Serper.dev (Google Patents)
+ * Phase B — AI analysis of real results for relevance scoring
+ */
+async function searchGooglePatents(params: PriorArtSearchParams, _projectId: string): Promise<PriorArtResult[]> {
+  // Phase A: Fetch real patents from Google Patents via Serper
+  console.log('Searching Google Patents via Serper.dev...');
+  const realPatents = await fetchRealPatents({
+    title: params.title,
+    description: params.description,
+    keywords: params.keywords,
+    maxResults: params.maxResults || 10,
+  });
 
-  const featuresText = params.keywords && params.keywords.length > 0
-    ? params.keywords.join(', ')
-    : focusAreas.join('\n');
+  if (realPatents.length === 0) {
+    console.warn('No results from Serper (API may not be configured). Returning empty results.');
+    return [];
+  }
+
+  console.log(`Found ${realPatents.length} real patents from Google Patents`);
+
+  // Phase B: Use AI to analyze relevance of real results
+  const analyzed = await analyzePatentRelevance(realPatents, params);
+  return analyzed;
+}
+
+/**
+ * AI analyzes REAL patent data for relevance to the invention.
+ * The AI does NOT invent patents — it only scores and analyzes patents already found.
+ */
+async function analyzePatentRelevance(
+  realPatents: SerperPatentResult[],
+  params: PriorArtSearchParams
+): Promise<PriorArtResult[]> {
+  // Format real patents for the AI prompt
+  const patentList = realPatents.map((p, i) =>
+    `${i + 1}. Patent: ${p.patentNumber}\n   Title: ${p.title}\n   Snippet: ${p.snippet}\n   Assignee: ${p.assignee || 'Unknown'}\n   Date: ${p.date || 'Unknown'}\n   URL: ${p.link}`
+  ).join('\n\n');
+
+  const analysisPrompt = `You are a patent examiner. Analyze the following REAL patents found via Google Patents for relevance to an invention.
+
+INVENTION TITLE: ${params.title}
+INVENTION DESCRIPTION: ${params.description}
+
+REAL PATENTS FOUND (these are verified Google Patents results — do NOT modify patent numbers, titles, or URLs):
+${patentList}
+
+For EACH patent above, provide a relevance analysis as a JSON array. Use the EXACT patent numbers and titles from above. Add these analysis fields:
+- patentNumber: (copy exactly from above)
+- title: (copy exactly from above)
+- abstract: The snippet from above (copy it)
+- assignee: (copy from above)
+- url: (copy from above)
+- date: (copy from above)
+- relevanceScore: 0-100, how relevant to the invention
+- technicalSimilarityScore: 0-100, technical similarity of approach
+- similarityExplanation: 2-3 sentences on similarity and key differences
+- relationshipType: "similar" | "improvement" | "different_approach" | "unrelated"
+- isBlocking: boolean, could this patent's claims block the invention?
+- threatenedClaims: array of integers (claim numbers that may overlap), or empty array
+- claimOverlapAnalysis: brief explanation of overlap, or empty string
+
+Respond with ONLY a JSON array containing one object per patent. Do NOT add patents not listed above.`;
 
   try {
-    console.log('Calling Gemini AI for prior art search...');
-
-    // Build an enhanced prompt that instructs Gemini to find REAL patents
-    const realPatentPrompt = buildRealPatentSearchPrompt(params, featuresText);
-
-    const timeoutPromise = new Promise<string>((_, reject) => {
-      setTimeout(() => reject(new Error('Prior art search timed out after 45 seconds')), 45000);
-    });
-
-    const searchPromise = generateText(realPatentPrompt, 'patent_prior_art_search');
-
-    const response = await Promise.race([searchPromise, timeoutPromise]);
-
-    console.log('Received AI response, parsing results...');
-
+    const response = await generateText(analysisPrompt, 'patent_prior_art_search');
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.log('No JSON found in response, falling back to prompted search');
-      return await searchWithPromptResolver(params, projectId, featuresText);
+      console.warn('AI analysis returned no JSON, using unscored results');
+      return realPatents.map(mapSerperToResult);
     }
 
-    const patents = JSON.parse(jsonMatch[0]);
-
-    if (!Array.isArray(patents) || patents.length === 0) {
-      console.log('Empty patent array, falling back to prompted search');
-      return await searchWithPromptResolver(params, projectId, featuresText);
+    const analyzed = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(analyzed) || analyzed.length === 0) {
+      return realPatents.map(mapSerperToResult);
     }
 
-    console.log(`Successfully parsed ${patents.length} patents from AI response`);
-
-    return patents.map((patent: any) => ({
-      patentNumber: patent.patentNumber || 'US-UNKNOWN',
-      title: patent.title || 'Unknown Patent',
-      abstract: patent.abstract || '',
-      filingDate: patent.filingDate ? new Date(patent.filingDate) : undefined,
-      grantDate: patent.grantDate ? new Date(patent.grantDate) : undefined,
-      assignee: patent.assignee || 'Unknown Assignee',
-      inventors: patent.inventors || [],
-      url: patent.url || `https://patents.google.com/patent/${patent.patentNumber?.replace(/[^A-Z0-9]/g, '')}`,
-      relevanceScore: patent.relevanceScore || 50,
-      technicalSimilarityScore: patent.technicalSimilarityScore || 50,
-      similarityExplanation: patent.similarityExplanation || '',
-      relationshipType: patent.relationshipType || 'unrelated',
-      isBlocking: patent.isBlocking || false,
-      threatenedClaims: patent.threatenedClaims || [],
-      claimOverlapAnalysis: patent.claimOverlapAnalysis || ''
-    }));
-  } catch (error) {
-    console.error('Prior art search generation failed:', error);
-    console.log('Returning default prior art patents');
-    return getDefaultPriorArt();
+    return analyzed.map((a: any, i: number) => {
+      const original = realPatents[i] || realPatents.find(p => p.patentNumber === a.patentNumber);
+      return {
+        patentNumber: a.patentNumber || original?.patentNumber || 'UNKNOWN',
+        title: a.title || original?.title || '',
+        abstract: a.abstract || original?.snippet || '',
+        filingDate: a.date ? new Date(a.date) : undefined,
+        grantDate: undefined,
+        assignee: a.assignee || original?.assignee || '',
+        inventors: typeof a.inventors === 'string' ? [a.inventors] : (a.inventors || (original?.inventor ? [original.inventor] : [])),
+        url: a.url || original?.link || '',
+        relevanceScore: a.relevanceScore ?? 50,
+        technicalSimilarityScore: a.technicalSimilarityScore ?? 50,
+        similarityExplanation: a.similarityExplanation || '',
+        relationshipType: a.relationshipType || 'unrelated',
+        isBlocking: a.isBlocking || false,
+        threatenedClaims: a.threatenedClaims || [],
+        claimOverlapAnalysis: a.claimOverlapAnalysis || '',
+      };
+    });
+  } catch (err) {
+    console.error('AI analysis failed, returning unscored results:', err);
+    return realPatents.map(mapSerperToResult);
   }
 }
 
-/**
- * Build a prompt that instructs Gemini to find real, verifiable patents.
- * Emphasizes citing actual patent numbers that can be looked up on Google Patents.
- */
-function buildRealPatentSearchPrompt(params: PriorArtSearchParams, featuresText: string): string {
-  return `You are a patent examiner conducting a prior art search. Find REAL, EXISTING patents that are relevant to the following invention.
-
-CRITICAL: You must cite REAL patent numbers that actually exist and can be verified on Google Patents (patents.google.com). Do NOT invent or fabricate patent numbers. If you are not confident a patent number is real, use the patent title and assignee to help identify it but mark the number as approximate.
-
-INVENTION TITLE: ${params.title}
-
-INVENTION DESCRIPTION: ${params.description}
-
-KEY TECHNICAL FEATURES:
-${featuresText}
-
-Search for patents in these categories:
-1. Patents with similar technical approaches (direct competitors)
-2. Patents that solve the same problem differently (alternative approaches)
-3. Patents whose claims could potentially block this invention
-4. Foundational patents in this technical domain
-
-For each patent found, provide a JSON array with these fields:
-- patentNumber: The actual US patent number (e.g., "US-11556757-B2" or "US2023/0050123A1")
-- title: The exact patent title
-- abstract: A 2-3 sentence summary of the patent
-- filingDate: Filing date if known (YYYY-MM-DD format)
-- assignee: The patent assignee/owner
-- inventors: Array of inventor names
-- url: Direct Google Patents URL
-- relevanceScore: 0-100, how relevant to THIS specific invention
-- technicalSimilarityScore: 0-100, how technically similar the approach is
-- similarityExplanation: 2-3 sentences explaining similarity AND key differences
-- relationshipType: One of "similar", "improvement", "different_approach", "unrelated"
-- isBlocking: Boolean, could this patent's claims block the invention?
-- threatenedClaims: Array of claim numbers (integers) from THIS invention that overlap
-- claimOverlapAnalysis: Brief explanation of which aspects of the invention overlap with this patent's claims
-
-Return ${params.maxResults || 10} patents as a JSON array. Prioritize patents with high relevance scores.
-Focus on US patents from the last 10 years. Include both granted patents and published applications.
-
-Respond with ONLY the JSON array, no other text.`;
-}
-
-/**
- * Fallback: use the inline prompt approach
- */
-async function searchWithPromptResolver(
-  params: PriorArtSearchParams,
-  _projectId: string,
-  featuresText: string
-): Promise<PriorArtResult[]> {
-  const analysisPrompt = buildPriorArtSearchPrompt({
-    title: params.title,
-    inventionDescription: params.description,
-    features: featuresText,
-    analysisTarget: params.analysisTarget || 'both'
-  });
-
-  const response = await generateText(analysisPrompt, 'patent_prior_art_search');
-  const jsonMatch = response.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) return getDefaultPriorArt();
-
-  const patents = JSON.parse(jsonMatch[0]);
-  if (!Array.isArray(patents) || patents.length === 0) return getDefaultPriorArt();
-
-  return patents.map((patent: any) => ({
-    patentNumber: patent.patentNumber || 'US-UNKNOWN',
-    title: patent.title || 'Unknown Patent',
-    abstract: patent.abstract || '',
-    filingDate: undefined,
-    grantDate: undefined,
-    assignee: patent.assignee || 'Unknown Assignee',
-    inventors: patent.inventors || [],
-    url: `https://patents.google.com/patent/${patent.patentNumber?.replace(/[^A-Z0-9]/g, '')}`,
-    relevanceScore: patent.relevanceScore || 50,
-    technicalSimilarityScore: patent.technicalSimilarityScore || 50,
-    similarityExplanation: patent.similarityExplanation || '',
-    relationshipType: patent.relationshipType || 'unrelated',
-    isBlocking: patent.isBlocking || false,
+/** Map a raw Serper result to PriorArtResult with default scores */
+function mapSerperToResult(p: SerperPatentResult): PriorArtResult {
+  return {
+    patentNumber: p.patentNumber || 'UNKNOWN',
+    title: p.title,
+    abstract: p.snippet,
+    filingDate: p.date ? new Date(p.date) : undefined,
+    assignee: p.assignee || '',
+    inventors: p.inventor ? [p.inventor] : [],
+    url: p.link,
+    relevanceScore: 50,
+    technicalSimilarityScore: 50,
+    similarityExplanation: '',
+    relationshipType: 'unrelated',
+    isBlocking: false,
     threatenedClaims: [],
-    claimOverlapAnalysis: ''
-  }));
+    claimOverlapAnalysis: '',
+  };
 }
 
 function getDefaultPriorArt(): PriorArtResult[] {
@@ -255,17 +185,6 @@ function getDefaultPriorArt(): PriorArtResult[] {
   return [];
 }
 
-function getFocusAreas(_analysisTarget?: string): string[] {
-  // Generic focus areas — actual search is driven by the invention title and description,
-  // not by hardcoded domains. These are only used as fallback keywords.
-  return [
-    'Systems and methods related to the described invention',
-    'Prior art with similar technical approaches',
-    'Alternative solutions to the same problem',
-    'Foundational patents in the relevant technical domain',
-    'Recent patents with overlapping claims'
-  ];
-}
 
 async function savePriorArtResults(
   projectId: string,

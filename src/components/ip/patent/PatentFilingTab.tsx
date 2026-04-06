@@ -11,7 +11,9 @@ import {
   Printer,
   AlertTriangle,
   Clock,
-  Info
+  Info,
+  Download,
+  Archive
 } from 'lucide-react';
 import {
   calculateFilingFee,
@@ -26,6 +28,9 @@ import {
   type FilingType
 } from '../../../services/patent/filingFeeService';
 import { getPatentStrength } from '../../../services/patent/patentWorkflowOrchestrator';
+import { generateADSForm, extractADSDataFromApplication } from '../../../services/patent/adsFormService';
+import { generateAllDeclarations } from '../../../services/patent/declarationFormService';
+import { generateMicroEntityCert } from '../../../services/patent/microEntityCertService';
 
 interface PatentFilingTabProps {
   application: {
@@ -39,8 +44,10 @@ interface PatentFilingTabProps {
     drawings: any[];
     inventor_name?: string | null;
     inventor_citizenship?: string;
+    inventors?: any[];
     correspondence_address?: any | null;
     attorney_info?: any | null;
+    government_interest?: string | null;
     metadata?: any;
   };
   onGenerateCoverSheet: () => void;
@@ -87,6 +94,7 @@ export function PatentFilingTab({
   const [loadingStrength, setLoadingStrength] = useState(false);
   const [filingDeadlines, setFilingDeadlines] = useState<FilingDeadline[]>([]);
   const [showCoverSheet, setShowCoverSheet] = useState(false);
+  const [generatingForm, setGeneratingForm] = useState<string | null>(null);
   const coverSheetRef = useRef<HTMLDivElement>(null);
 
   // Calculate page count
@@ -147,6 +155,41 @@ export function PatentFilingTab({
       printWindow.document.write(coverSheetHTML);
       printWindow.document.close();
       printWindow.print();
+    }
+  };
+
+  const downloadPdf = (doc: any, filename: string) => {
+    doc.save(filename);
+  };
+
+  const handleGenerateADS = () => {
+    setGeneratingForm('ads');
+    try {
+      const adsData = extractADSDataFromApplication(application as any);
+      const doc = generateADSForm(adsData);
+      downloadPdf(doc, `ADS_${application.title.slice(0, 30).replace(/\s+/g, '_')}.pdf`);
+    } finally {
+      setGeneratingForm(null);
+    }
+  };
+
+  const handleGenerateDeclarations = () => {
+    setGeneratingForm('declaration');
+    try {
+      const doc = generateAllDeclarations(application as any);
+      downloadPdf(doc, `Declaration_${application.title.slice(0, 30).replace(/\s+/g, '_')}.pdf`);
+    } finally {
+      setGeneratingForm(null);
+    }
+  };
+
+  const handleGenerateMicroEntity = () => {
+    setGeneratingForm('micro');
+    try {
+      const doc = generateMicroEntityCert(application as any);
+      downloadPdf(doc, `Micro_Entity_Cert_SB15A.pdf`);
+    } finally {
+      setGeneratingForm(null);
     }
   };
 
@@ -450,6 +493,51 @@ export function PatentFilingTab({
             <p className="text-xs text-gray-500">Generating cover sheet...</p>
           </div>
         )}
+      </div>
+
+      {/* USPTO Filing Forms */}
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-50 flex items-center gap-2">
+          <Archive className="w-4 h-4 text-violet-600" />
+          <h4 className="text-sm font-semibold text-gray-900">USPTO Filing Forms</h4>
+          <span className="text-xs text-gray-400 ml-auto">Download individual forms as PDF</span>
+        </div>
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* ADS */}
+          <button
+            onClick={handleGenerateADS}
+            disabled={generatingForm === 'ads'}
+            className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-200 transition-all text-center"
+          >
+            {generatingForm === 'ads' ? <Loader2 className="w-5 h-5 animate-spin text-indigo-500" /> : <Download className="w-5 h-5 text-indigo-600" />}
+            <span className="text-xs font-semibold text-gray-800">Application Data Sheet</span>
+            <span className="text-[10px] text-gray-400">PTO/AIA/14</span>
+          </button>
+
+          {/* Declaration */}
+          <button
+            onClick={handleGenerateDeclarations}
+            disabled={generatingForm === 'declaration'}
+            className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-200 transition-all text-center"
+          >
+            {generatingForm === 'declaration' ? <Loader2 className="w-5 h-5 animate-spin text-indigo-500" /> : <Download className="w-5 h-5 text-indigo-600" />}
+            <span className="text-xs font-semibold text-gray-800">Inventor Declaration(s)</span>
+            <span className="text-[10px] text-gray-400">PTO/AIA/01</span>
+          </button>
+
+          {/* Micro Entity Cert — only show if micro entity */}
+          {(application.entity_status === 'micro_entity' || selectedEntityStatus === 'micro_entity') && (
+            <button
+              onClick={handleGenerateMicroEntity}
+              disabled={generatingForm === 'micro'}
+              className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-xl hover:bg-violet-50 hover:border-violet-200 transition-all text-center"
+            >
+              {generatingForm === 'micro' ? <Loader2 className="w-5 h-5 animate-spin text-violet-500" /> : <Download className="w-5 h-5 text-violet-600" />}
+              <span className="text-xs font-semibold text-gray-800">Micro Entity Cert</span>
+              <span className="text-[10px] text-gray-400">PTO/SB/15A</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
