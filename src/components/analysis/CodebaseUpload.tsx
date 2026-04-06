@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
-import { GitFork, Upload, Loader2, FolderArchive, ArrowRight, AlertCircle, X, CheckCircle, Code, Search, Sparkles, FileText, Shield } from 'lucide-react';
+import { useState } from 'react';
+import { GitFork, Loader2, ArrowRight, AlertCircle, X, CheckCircle, Code, Search, Sparkles, FileText, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProject } from '../../contexts/ProjectContext';
-import { ingestFromGitHub, ingestFromZip, getLanguageBreakdown } from '../../services/analysis/codebaseIngestionService';
+import { ingestFromGitHub, getLanguageBreakdown } from '../../services/analysis/codebaseIngestionService';
 import { analyzeCodebase } from '../../services/analysis/codebaseAnalysisEngine';
 import { runFullIPAnalysis } from '../../services/orchestration/ipAutoOrchestrator';
 import { supabase } from '../../lib/supabase';
@@ -24,12 +24,10 @@ const STEP_CONFIG = [
 export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
   const { user, session } = useAuth();
   const { createProject, updateProject } = useProject();
-  const [mode, setMode] = useState<'github' | 'zip'>('github');
   const [repoUrl, setRepoUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress | null>(null);
   const [error, setError] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleGitHubAnalysis = async () => {
     if (!repoUrl.trim() || !user) return;
@@ -97,63 +95,6 @@ export function CodebaseUpload({ onAnalysisComplete }: CodebaseUploadProps) {
         step: 'complete', progress: 100,
         message: 'IP analysis complete! Patents, copyrights, and trademarks generated.',
       });
-      setTimeout(onAnalysisComplete, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analysis failed');
-      setProgress(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleZipUpload = async (file: File) => {
-    if (!user) return;
-    setError('');
-    setLoading(true);
-    setProgress({ step: 'fetching', progress: 0, message: 'Reading zip file...' });
-
-    try {
-      const project = await createProject({
-        name: file.name.replace(/\.zip$/i, ''),
-        source_type: 'zip_upload',
-      });
-
-      await updateProject(project.id, { analysis_status: 'analyzing' });
-
-      setProgress({ step: 'parsing', progress: 5, message: 'Extracting files...' });
-      const files = await ingestFromZip(file);
-
-      // Store file records
-      const fileRows = files.map(f => ({
-        project_id: project.id,
-        file_path: f.path,
-        language: f.language,
-        line_count: f.lineCount,
-      }));
-      if (fileRows.length > 0) {
-        for (let i = 0; i < fileRows.length; i += 100) {
-          await supabase.from('project_files').insert(fileRows.slice(i, i + 100));
-        }
-      }
-
-      setProgress({ step: 'analyzing', progress: 10, message: 'Starting AI analysis...' });
-      await analyzeCodebase(project.id, files, setProgress);
-
-      // Auto-generate all IP applications
-      setProgress({ step: 'generating_patents', progress: 55, message: 'Generating patent applications...' });
-      await runFullIPAnalysis(project.id, user.id, project.name, (ipProgress) => {
-        const basePercent = 55;
-        const pct = basePercent + Math.round(ipProgress.overallPercent * 0.4);
-        const stepKey = ipProgress.phase === 'patents' ? 'generating_patents' : 'assessing_ip';
-        setProgress({
-          step: stepKey as AnalysisProgress['step'],
-          progress: Math.min(pct, 95),
-          message: ipProgress.step,
-          detail: ipProgress.detail,
-        });
-      });
-
-      setProgress({ step: 'complete', progress: 100, message: 'IP analysis complete!' });
       setTimeout(onAnalysisComplete, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
