@@ -147,7 +147,7 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
   // Fee transmittal state
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'deposit_account' | 'electronic' | 'check'>('electronic');
   const [depositAccountNumber, setDepositAccountNumber] = useState('');
-  const filingType: FilingType = (application.filing_type as FilingType) || 'provisional';
+  const [filingType, setFilingType] = useState<FilingType>('provisional');
 
   // Fee calculation
   const feeBreakdown = useMemo(() => {
@@ -510,6 +510,33 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
         return (
           <div className="space-y-5">
             <p className="text-xs text-gray-500">The fee transmittal (PTO/SB/17) accompanies your filing and documents the fees paid.</p>
+
+            {/* Filing type selector */}
+            <div>
+              <label className={labelCls}>Filing Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'provisional' as FilingType, label: 'Provisional', desc: 'Lower fee, 12-month priority window' },
+                  { value: 'non_provisional' as FilingType, label: 'Non-Provisional', desc: 'Full examination, includes search + exam fees' },
+                ]).map(opt => (
+                  <label key={opt.value}
+                    className={`flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                      filingType === opt.value
+                        ? 'border-green-300 bg-green-50 ring-1 ring-green-200'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}>
+                    <input type="radio" name="filingType" value={opt.value}
+                      checked={filingType === opt.value}
+                      onChange={() => setFilingType(opt.value)}
+                      className="mt-0.5" />
+                    <div>
+                      <span className="text-xs font-semibold text-gray-800">{opt.label}</span>
+                      <p className="text-[10px] text-gray-500">{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
 
             {/* Fee summary */}
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
