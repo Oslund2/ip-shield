@@ -551,3 +551,224 @@ export function generateCoverSheetHTML(data: CoverSheetData): string {
 export function generateCoverSheetPDF(data: CoverSheetData): jsPDF {
   return generateSB16PDF(data);
 }
+
+// ---------------------------------------------------------------------------
+// SB/17 Fee Transmittal PDF
+// ---------------------------------------------------------------------------
+
+export interface FeeTransmittalData {
+  title: string;
+  firstNamedInventor: string;
+  docketNumber?: string;
+  entityStatus: EntityStatus;
+  filingType: 'provisional' | 'non_provisional';
+  paymentMethod: 'credit_card' | 'deposit_account' | 'electronic' | 'check';
+  depositAccountNumber?: string;
+  authorizeCharge?: boolean;
+  feeLines: { description: string; feeCode?: string; amount: number }[];
+  totalFee: number;
+  signatureName?: string;
+  signatureDate?: string;
+  signatureRegNumber?: string;
+  signaturePhone?: string;
+}
+
+export function generateSB17PDF(data: FeeTransmittalData): jsPDF {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+  let y = MARGIN;
+
+  // Header
+  doc.setFontSize(SMALL);
+  doc.setFont('helvetica', 'normal');
+  doc.text('PTO/SB/17 (09-23)', PAGE_WIDTH - MARGIN, y, { align: 'right' });
+  y += LINE;
+  doc.text('Approved for use through 01/31/2026. OMB 0651-0032', PAGE_WIDTH - MARGIN, y, { align: 'right' });
+  y += LINE;
+  doc.text('U.S. Patent and Trademark Office; U.S. DEPARTMENT OF COMMERCE', PAGE_WIDTH - MARGIN, y, { align: 'right' });
+  y += LINE * 1.5;
+
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text('FEE TRANSMITTAL', PAGE_WIDTH / 2, y, { align: 'center' });
+  y += LINE * 1.2;
+
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'normal');
+  doc.text('for FY 2024', PAGE_WIDTH / 2, y, { align: 'center' });
+  y += LINE * 2;
+
+  // Application info bar
+  drawBox(doc, MARGIN, y - 10, CONTENT_WIDTH, 55, true);
+  doc.setFontSize(SMALL);
+  const infoY = y;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Application Number:', MARGIN + 5, infoY);
+  doc.setFont('helvetica', 'normal');
+  doc.text('(to be assigned)', MARGIN + 110, infoY);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Filing Date:', PAGE_WIDTH / 2 + 10, infoY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(new Date().toLocaleDateString(), PAGE_WIDTH / 2 + 70, infoY);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('First Named Inventor:', MARGIN + 5, infoY + LINE);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.firstNamedInventor, MARGIN + 120, infoY + LINE);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Docket Number:', PAGE_WIDTH / 2 + 10, infoY + LINE);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.docketNumber || '', PAGE_WIDTH / 2 + 95, infoY + LINE);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Title of Invention:', MARGIN + 5, infoY + LINE * 2);
+  doc.setFont('helvetica', 'normal');
+  const titleText = doc.splitTextToSize(data.title, CONTENT_WIDTH - 120);
+  doc.text(titleText[0] || '', MARGIN + 105, infoY + LINE * 2);
+
+  y += 55 + LINE;
+
+  // Applicant entity status
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('APPLICANT CLAIMS', MARGIN, y);
+  y += LINE + 2;
+
+  doc.setFontSize(SMALL);
+  doc.setFont('helvetica', 'normal');
+  checkbox(doc, MARGIN + 5, y, data.entityStatus === 'small_entity');
+  doc.text('Small Entity Status (37 CFR 1.27)', MARGIN + 18, y);
+  y += LINE + 2;
+  checkbox(doc, MARGIN + 5, y, data.entityStatus === 'micro_entity');
+  doc.text('Micro Entity Status (37 CFR 1.29)  — Attach form PTO/SB/15A or 15B', MARGIN + 18, y);
+  y += LINE * 2;
+
+  // Method of payment
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('METHOD OF PAYMENT (check one)', MARGIN, y);
+  y += LINE + 4;
+
+  doc.setFontSize(SMALL);
+  doc.setFont('helvetica', 'normal');
+  const paymentMethods = [
+    { value: 'check', label: 'Check or Money Order' },
+    { value: 'credit_card', label: 'Credit Card (complete form PTO-2038)' },
+    { value: 'deposit_account', label: `Deposit Account Number: ${data.depositAccountNumber || '________'}` },
+    { value: 'electronic', label: 'Electronic Payment via Patent Center / EFS-Web' },
+  ];
+  paymentMethods.forEach(pm => {
+    checkbox(doc, MARGIN + 5, y, data.paymentMethod === pm.value);
+    doc.text(pm.label, MARGIN + 18, y);
+    y += LINE + 2;
+  });
+
+  if (data.paymentMethod === 'deposit_account') {
+    checkbox(doc, MARGIN + 25, y, data.authorizeCharge !== false);
+    doc.text('The Director is hereby authorized to charge indicated fees and credit any overpayment to the above deposit account.', MARGIN + 38, y);
+    y += LINE + 2;
+  }
+
+  y += LINE;
+
+  // Fee calculation table
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('FEE CALCULATION', MARGIN, y);
+  y += LINE + 2;
+
+  // Table header
+  const tblX = MARGIN;
+  const tblW = CONTENT_WIDTH;
+  const col1W = 320; // Description
+  const col2W = 80;  // Fee Code
+
+  drawBox(doc, tblX, y - 10, tblW, 16, true);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Fee Description', tblX + 5, y);
+  doc.text('Fee Code', tblX + col1W + 5, y);
+  doc.text('Amount ($)', tblX + col1W + col2W + 5, y);
+  y += LINE + 4;
+
+  // Fee lines
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(SMALL);
+  data.feeLines.forEach(line => {
+    if (line.amount <= 0) return;
+    drawBox(doc, tblX, y - 10, tblW, 16);
+    doc.text(line.description, tblX + 5, y);
+    if (line.feeCode) doc.text(line.feeCode, tblX + col1W + 5, y);
+    doc.text(formatUSD(line.amount), tblX + col1W + col2W + 5, y);
+    y += 16;
+  });
+
+  // Total row
+  drawBox(doc, tblX, y - 10, tblW, 20, true);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(NORMAL);
+  doc.text('TOTAL', tblX + 5, y + 2);
+  doc.text(formatUSD(data.totalFee), tblX + col1W + col2W + 5, y + 2);
+  y += 20 + LINE * 2;
+
+  // Warning notice
+  y = needsNewPage(doc, y, 60);
+  drawBox(doc, MARGIN, y - 10, CONTENT_WIDTH, 40);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'italic');
+  const warningText = 'WARNING: Information on this form may become public. Credit card information should not be included on this form. Provide credit card information and authorization on PTO-2038.';
+  const warnLines = doc.splitTextToSize(warningText, CONTENT_WIDTH - 10);
+  doc.text(warnLines, MARGIN + 5, y);
+  y += 40 + LINE;
+
+  // Signature
+  y = needsNewPage(doc, y, 80);
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SIGNATURE', MARGIN, y);
+  y += LINE * 2;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(SMALL);
+  doc.line(MARGIN, y, MARGIN + 250, y);
+  y += LINE;
+  doc.text('Signature', MARGIN, y);
+  y += LINE * 1.5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Name (Print/Type):', MARGIN, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.signatureName || data.firstNamedInventor, MARGIN + 110, y);
+  doc.line(MARGIN + 108, y + 2, MARGIN + 300, y + 2);
+  y += LINE * 1.5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Registration No.:', MARGIN, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.signatureRegNumber || '', MARGIN + 110, y);
+  doc.line(MARGIN + 108, y + 2, MARGIN + 250, y + 2);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Telephone:', MARGIN + 270, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.signaturePhone || '', MARGIN + 330, y);
+  y += LINE * 1.5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Date:', MARGIN, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.signatureDate || new Date().toLocaleDateString(), MARGIN + 110, y);
+  doc.line(MARGIN + 108, y + 2, MARGIN + 250, y + 2);
+
+  return doc;
+}
+
+function formatUSD(amount: number): string {
+  return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function downloadFeeTransmittal(data: FeeTransmittalData): void {
+  const pdf = generateSB17PDF(data);
+  pdf.save(`PTO_SB17_Fee_Transmittal_${data.title.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+}

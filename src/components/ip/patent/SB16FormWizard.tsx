@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
   X, ChevronRight, ChevronLeft, CheckCircle, AlertCircle,
   Plus, Trash2, Download, Printer, User, MapPin, Briefcase,
-  Building, FileText, Shield
+  Building, FileText, Shield, DollarSign
 } from 'lucide-react';
 import {
   validateCoverSheetData,
@@ -10,12 +10,20 @@ import {
   createDefaultCorrespondenceAddress,
   generateCoverSheetHTML,
   downloadCoverSheet,
+  downloadFeeTransmittal,
   type CoverSheetData,
   type Inventor,
   type CorrespondenceAddress,
   type AttorneyInfo,
+  type FeeTransmittalData,
 } from '../../../services/patent/coverSheetService';
-import type { EntityStatus } from '../../../services/patent/filingFeeService';
+import {
+  calculateFilingFee,
+  formatCurrency,
+  estimatePageCount,
+  type EntityStatus,
+  type FilingType,
+} from '../../../services/patent/filingFeeService';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -32,6 +40,11 @@ interface SB16FormWizardProps {
     attorney_info?: any | null;
     entity_status?: string | null;
     government_interest?: string | null;
+    filing_type?: string | null;
+    specification?: string | null;
+    abstract?: string | null;
+    claims: any[];
+    drawings: any[];
     metadata?: any;
   };
   onClose: () => void;
@@ -47,6 +60,7 @@ const STEPS = [
   { key: 'address', label: 'Correspondence', icon: MapPin },
   { key: 'attorney', label: 'Attorney / Agent', icon: Briefcase },
   { key: 'entity', label: 'Entity & Gov', icon: Shield },
+  { key: 'fees', label: 'Fee Transmittal', icon: DollarSign },
   { key: 'review', label: 'Review & Generate', icon: FileText },
 ] as const;
 
@@ -130,6 +144,27 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
   const [signatureDate, setSignatureDate] = useState(new Date().toISOString().split('T')[0]);
   const [showPreview, setShowPreview] = useState(false);
 
+  // Fee transmittal state
+  const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'deposit_account' | 'electronic' | 'check'>('electronic');
+  const [depositAccountNumber, setDepositAccountNumber] = useState('');
+  const filingType: FilingType = (application.filing_type as FilingType) || 'provisional';
+
+  // Fee calculation
+  const feeBreakdown = useMemo(() => {
+    const specWords = (application.specification || '').split(/\s+/).filter(Boolean).length;
+    const abstractWords = (application.abstract || '').split(/\s+/).filter(Boolean).length;
+    const pageCount = estimatePageCount(specWords, abstractWords, application.claims.length, application.drawings.length);
+    const independentClaims = application.claims.filter((c: any) => c.claim_type === 'independent').length;
+    return calculateFilingFee({
+      filingType,
+      entityStatus,
+      pageCount,
+      totalClaims: application.claims.length,
+      independentClaims,
+      multipleDependent: false,
+    });
+  }, [entityStatus, filingType, application.specification, application.abstract, application.claims, application.drawings]);
+
   // Build the data object
   const formData = useMemo<CoverSheetData>(() => ({
     title,
@@ -146,7 +181,7 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
   const validation = useMemo(() => validateCoverSheetData(formData), [formData]);
 
   const previewHTML = useMemo(() => {
-    if (step === 4) return generateCoverSheetHTML(formData);
+    if (step === 5) return generateCoverSheetHTML(formData);
     return '';
   }, [formData, step]);
 
@@ -177,6 +212,8 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
         return []; // Attorney is optional
       case 3:
         return []; // Entity is pre-selected, gov interest is optional
+      case 4:
+        return []; // Fees auto-calculated, payment method pre-selected
       default:
         return validation.errors;
     }
@@ -213,6 +250,41 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
       w.document.close();
       w.print();
     }
+  };
+
+  const buildFeeTransmittalData = (): FeeTransmittalData => {
+    const feeLines: { description: string; feeCode?: string; amount: number }[] = [];
+    if (feeBreakdown.baseFee > 0) feeLines.push({ description: filingType === 'provisional' ? 'Provisional Filing Fee' : 'Basic Filing Fee', amount: feeBreakdown.baseFee });
+    if (feeBreakdown.searchFee > 0) feeLines.push({ description: 'Search Fee', amount: feeBreakdown.searchFee });
+    if (feeBreakdown.examinationFee > 0) feeLines.push({ description: 'Examination Fee', amount: feeBreakdown.examinationFee });
+    if (feeBreakdown.claimsFee > 0) feeLines.push({ description: 'Excess Claims Fee', amount: feeBreakdown.claimsFee });
+    if (feeBreakdown.applicationSizeFee > 0) feeLines.push({ description: 'Application Size Fee (over 100 pages)', amount: feeBreakdown.applicationSizeFee });
+    return {
+      title,
+      firstNamedInventor: inventors[0]?.fullName || '',
+      docketNumber: attorney.docketNumber || undefined,
+      entityStatus,
+      filingType: filingType === 'provisional' ? 'provisional' : 'non_provisional',
+      paymentMethod,
+      depositAccountNumber: paymentMethod === 'deposit_account' ? depositAccountNumber : undefined,
+      authorizeCharge: paymentMethod === 'deposit_account',
+      feeLines,
+      totalFee: feeBreakdown.totalFee,
+      signatureName: signatureName || inventors[0]?.fullName || '',
+      signatureDate,
+      signatureRegNumber: attorney.registrationNumber || undefined,
+      signaturePhone: correspondence.phone || undefined,
+    };
+  };
+
+  const handleDownloadSB17 = () => {
+    downloadFeeTransmittal(buildFeeTransmittalData());
+  };
+
+  const handleDownloadBoth = () => {
+    onSave(formData);
+    downloadCoverSheet(formData);
+    setTimeout(() => downloadFeeTransmittal(buildFeeTransmittalData()), 500);
   };
 
   // ---------------------------------------------------------------------------
@@ -433,8 +505,97 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
           </div>
         );
 
-      // ===== STEP 4: Review & Generate =====
+      // ===== STEP 4: Fee Transmittal (SB/17) =====
       case 4:
+        return (
+          <div className="space-y-5">
+            <p className="text-xs text-gray-500">The fee transmittal (PTO/SB/17) accompanies your filing and documents the fees paid.</p>
+
+            {/* Fee summary */}
+            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                <h4 className="text-sm font-semibold text-gray-800">Calculated Fees ({entityStatus === 'micro_entity' ? 'Micro' : entityStatus === 'small_entity' ? 'Small' : 'Regular'} Entity)</h4>
+              </div>
+              <div className="p-4 space-y-2">
+                {feeBreakdown.baseFee > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">{filingType === 'provisional' ? 'Provisional Filing Fee' : 'Basic Filing Fee'}</span>
+                    <span className="font-medium text-gray-800">{formatCurrency(feeBreakdown.baseFee)}</span>
+                  </div>
+                )}
+                {feeBreakdown.searchFee > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Search Fee</span>
+                    <span className="font-medium text-gray-800">{formatCurrency(feeBreakdown.searchFee)}</span>
+                  </div>
+                )}
+                {feeBreakdown.examinationFee > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Examination Fee</span>
+                    <span className="font-medium text-gray-800">{formatCurrency(feeBreakdown.examinationFee)}</span>
+                  </div>
+                )}
+                {feeBreakdown.claimsFee > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Excess Claims Fee</span>
+                    <span className="font-medium text-gray-800">{formatCurrency(feeBreakdown.claimsFee)}</span>
+                  </div>
+                )}
+                {feeBreakdown.applicationSizeFee > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Application Size Fee</span>
+                    <span className="font-medium text-gray-800">{formatCurrency(feeBreakdown.applicationSizeFee)}</span>
+                  </div>
+                )}
+                <div className="border-t border-gray-200 pt-2 flex justify-between">
+                  <span className="text-sm font-bold text-gray-900">Total</span>
+                  <span className="text-lg font-bold text-gray-900">{formatCurrency(feeBreakdown.totalFee)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment method */}
+            <div>
+              <label className="text-sm font-semibold text-gray-800 mb-3 block">Payment Method</label>
+              <div className="space-y-2">
+                {([
+                  { value: 'electronic' as const, label: 'Electronic Payment via Patent Center', desc: 'Pay online when submitting through USPTO Patent Center (most common)' },
+                  { value: 'credit_card' as const, label: 'Credit Card (PTO-2038)', desc: 'Complete separate credit card form PTO-2038' },
+                  { value: 'deposit_account' as const, label: 'USPTO Deposit Account', desc: 'Charge to an existing USPTO deposit account' },
+                  { value: 'check' as const, label: 'Check or Money Order', desc: 'Mail a check payable to "Director of the USPTO"' },
+                ]).map(opt => (
+                  <label key={opt.value}
+                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                      paymentMethod === opt.value
+                        ? 'border-green-300 bg-green-50 ring-1 ring-green-200'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}>
+                    <input type="radio" name="payment" value={opt.value}
+                      checked={paymentMethod === opt.value}
+                      onChange={() => setPaymentMethod(opt.value)}
+                      className="mt-1" />
+                    <div>
+                      <span className="text-sm font-semibold text-gray-800">{opt.label}</span>
+                      <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {paymentMethod === 'deposit_account' && (
+              <div>
+                <label className={labelCls}>Deposit Account Number</label>
+                <input type="text" value={depositAccountNumber}
+                  onChange={e => setDepositAccountNumber(e.target.value)}
+                  className={inputCls} placeholder="XX-XXXX" />
+              </div>
+            )}
+          </div>
+        );
+
+      // ===== STEP 5: Review & Generate =====
+      case 5:
         return (
           <div className="space-y-5">
             {/* Validation summary */}
@@ -480,7 +641,7 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
             <div>
               <button type="button" onClick={() => setShowPreview(!showPreview)}
                 className="text-xs font-medium text-blue-600 hover:text-blue-700 mb-2">
-                {showPreview ? 'Hide Preview' : 'Show Form Preview'}
+                {showPreview ? 'Hide Preview' : 'Show SB/16 Preview'}
               </button>
               {showPreview && (
                 <div className="border border-gray-200 rounded-xl p-4 bg-white overflow-auto max-h-[400px] text-xs"
@@ -489,17 +650,29 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
             </div>
 
             {/* Generate buttons */}
-            <div className="flex gap-3">
-              <button type="button" onClick={handleGenerate} disabled={!validation.valid}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:shadow-lg hover:shadow-blue-600/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+            <div className="space-y-3">
+              <button type="button" onClick={handleDownloadBoth} disabled={!validation.valid}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:shadow-lg hover:shadow-blue-600/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 <Download className="w-4 h-4" />
-                Download PTO/SB/16 PDF
+                Download Both Forms (SB/16 + SB/17)
               </button>
-              <button type="button" onClick={handlePrint} disabled={!validation.valid}
-                className="flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
-                <Printer className="w-4 h-4" />
-                Print
-              </button>
+              <div className="grid grid-cols-3 gap-2">
+                <button type="button" onClick={handleGenerate} disabled={!validation.valid}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-all">
+                  <FileText className="w-3.5 h-3.5" />
+                  SB/16 Only
+                </button>
+                <button type="button" onClick={handleDownloadSB17} disabled={!validation.valid}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-all">
+                  <DollarSign className="w-3.5 h-3.5" />
+                  SB/17 Only
+                </button>
+                <button type="button" onClick={handlePrint} disabled={!validation.valid}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-all">
+                  <Printer className="w-3.5 h-3.5" />
+                  Print
+                </button>
+              </div>
             </div>
           </div>
         );
@@ -552,7 +725,7 @@ export function SB16FormWizard({ application, onClose, onSave }: SB16FormWizardP
           {renderStep()}
 
           {/* Step-level errors */}
-          {stepErrors.length > 0 && step < 4 && (
+          {stepErrors.length > 0 && step < 5 && (
             <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-3">
               <p className="text-xs font-medium text-amber-800 mb-1">Complete these fields to continue:</p>
               <ul className="space-y-0.5">
