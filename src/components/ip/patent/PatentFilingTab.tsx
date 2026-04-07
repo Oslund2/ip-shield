@@ -13,7 +13,8 @@ import {
   Clock,
   Info,
   Download,
-  Archive
+  Archive,
+  FileSignature
 } from 'lucide-react';
 import {
   calculateFilingFee,
@@ -31,6 +32,9 @@ import { getPatentStrength } from '../../../services/patent/patentWorkflowOrches
 import { generateADSForm, extractADSDataFromApplication } from '../../../services/patent/adsFormService';
 import { generateAllDeclarations } from '../../../services/patent/declarationFormService';
 import { generateMicroEntityCert } from '../../../services/patent/microEntityCertService';
+import { SB16FormWizard } from './SB16FormWizard';
+import { supabase } from '../../../lib/supabase';
+import type { CoverSheetData } from '../../../services/patent/coverSheetService';
 
 interface PatentFilingTabProps {
   application: {
@@ -95,6 +99,7 @@ export function PatentFilingTab({
   const [filingDeadlines, setFilingDeadlines] = useState<FilingDeadline[]>([]);
   const [showCoverSheet, setShowCoverSheet] = useState(false);
   const [generatingForm, setGeneratingForm] = useState<string | null>(null);
+  const [showSB16Wizard, setShowSB16Wizard] = useState(false);
   const coverSheetRef = useRef<HTMLDivElement>(null);
 
   // Calculate page count
@@ -181,6 +186,36 @@ export function PatentFilingTab({
     } finally {
       setGeneratingForm(null);
     }
+  };
+
+  const handleSB16Save = async (data: CoverSheetData) => {
+    // Persist the wizard data back to the patent application
+    try {
+      const inventors = data.inventors.map(inv => ({
+        id: inv.id,
+        fullName: inv.fullName,
+        residence: inv.residence,
+        citizenship: inv.citizenship,
+        mailingAddress: inv.mailingAddress,
+      }));
+
+      await (supabase as any)
+        .from('patent_applications')
+        .update({
+          title: data.title,
+          inventors,
+          correspondence_address: data.correspondenceAddress,
+          attorney_info: data.attorneyInfo || null,
+          entity_status: data.entityStatus,
+          government_interest: data.governmentInterest || null,
+          inventor_name: data.inventors[0]?.fullName || null,
+          inventor_citizenship: data.inventors[0]?.citizenship || null,
+        })
+        .eq('id', application.id);
+    } catch (err) {
+      console.error('Failed to save SB/16 data:', err);
+    }
+    setShowSB16Wizard(false);
   };
 
   const handleGenerateMicroEntity = () => {
@@ -502,7 +537,17 @@ export function PatentFilingTab({
           <h4 className="text-sm font-semibold text-gray-900">USPTO Filing Forms</h4>
           <span className="text-xs text-gray-400 ml-auto">Download individual forms as PDF</span>
         </div>
-        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* SB/16 Cover Sheet Wizard */}
+          <button
+            onClick={() => setShowSB16Wizard(true)}
+            className="flex flex-col items-center gap-2 p-4 border-2 border-blue-200 bg-blue-50/50 rounded-xl hover:bg-blue-100 hover:border-blue-300 transition-all text-center"
+          >
+            <FileSignature className="w-5 h-5 text-blue-600" />
+            <span className="text-xs font-semibold text-gray-800">Cover Sheet Wizard</span>
+            <span className="text-[10px] text-gray-400">PTO/SB/16</span>
+          </button>
+
           {/* ADS */}
           <button
             onClick={handleGenerateADS}
@@ -539,6 +584,15 @@ export function PatentFilingTab({
           )}
         </div>
       </div>
+
+      {/* SB/16 Form Fill Wizard */}
+      {showSB16Wizard && (
+        <SB16FormWizard
+          application={application}
+          onClose={() => setShowSB16Wizard(false)}
+          onSave={handleSB16Save}
+        />
+      )}
     </div>
   );
 }

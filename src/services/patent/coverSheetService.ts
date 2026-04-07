@@ -34,6 +34,7 @@ export interface AttorneyInfo {
   name?: string;
   registrationNumber?: string;
   firm?: string;
+  docketNumber?: string;
 }
 
 export interface CoverSheetData {
@@ -44,368 +45,343 @@ export interface CoverSheetData {
   entityStatus: EntityStatus;
   governmentInterest?: string;
   filingDate?: Date;
+  docketNumber?: string;
+  signatureName?: string;
+  signatureDate?: string;
 }
 
-export function generateCoverSheetHTML(data: CoverSheetData): string {
-  const inventorRows = data.inventors.map((inv, idx) => `
-    <tr>
-      <td style="padding: 8px; border: 1px solid #000;">${idx + 1}</td>
-      <td style="padding: 8px; border: 1px solid #000;">${inv.fullName}</td>
-      <td style="padding: 8px; border: 1px solid #000;">${inv.residence.city}, ${inv.residence.state}, ${inv.residence.country}</td>
-      <td style="padding: 8px; border: 1px solid #000;">${inv.citizenship}</td>
-    </tr>
-  `).join('');
+// ---------------------------------------------------------------------------
+// PDF generation — PTO/SB/16 layout
+// ---------------------------------------------------------------------------
 
-  const entityCheckboxes = `
-    <div style="margin: 10px 0;">
-      <label style="margin-right: 20px;">
-        <input type="checkbox" ${data.entityStatus === 'regular' ? 'checked' : ''} disabled /> Regular Entity
-      </label>
-      <label style="margin-right: 20px;">
-        <input type="checkbox" ${data.entityStatus === 'small_entity' ? 'checked' : ''} disabled /> Small Entity (37 CFR 1.27)
-      </label>
-      <label>
-        <input type="checkbox" ${data.entityStatus === 'micro_entity' ? 'checked' : ''} disabled /> Micro Entity (37 CFR 1.29)
-      </label>
-    </div>
-  `;
+const MARGIN = 50;
+const PAGE_WIDTH = 612;  // Letter
+const PAGE_HEIGHT = 792;
+const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+const LINE = 12;
+const SMALL = 8;
+const NORMAL = 9;
 
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Provisional Application for Patent Cover Sheet</title>
-  <style>
-    body { font-family: Arial, sans-serif; font-size: 11pt; margin: 40px; line-height: 1.4; }
-    h1 { text-align: center; font-size: 14pt; margin-bottom: 5px; }
-    h2 { text-align: center; font-size: 12pt; margin-top: 0; color: #333; }
-    .form-number { text-align: right; font-size: 10pt; margin-bottom: 20px; }
-    .section { margin: 20px 0; }
-    .section-title { font-weight: bold; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
-    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-    th { background: #f0f0f0; padding: 8px; border: 1px solid #000; text-align: left; }
-    td { padding: 8px; border: 1px solid #000; }
-    .field { margin: 10px 0; }
-    .field-label { font-weight: bold; }
-    .field-value { border-bottom: 1px solid #000; min-height: 20px; padding: 2px 5px; }
-    .checkbox-group { margin: 10px 0; }
-    .notice { background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin: 15px 0; font-size: 10pt; }
-    .signature-section { margin-top: 40px; }
-    .signature-line { border-bottom: 1px solid #000; width: 300px; margin: 30px 0 5px 0; }
-    @media print { body { margin: 20px; } }
-  </style>
-</head>
-<body>
-  <div class="form-number">
-    <strong>PTO/SB/16</strong><br/>
-    Doc Code: PROVAPP
-  </div>
-
-  <h1>PROVISIONAL APPLICATION FOR PATENT COVER SHEET</h1>
-  <h2>This is a request for filing a PROVISIONAL APPLICATION FOR PATENT under 37 CFR 1.53(c)</h2>
-
-  <div class="notice">
-    <strong>NOTICE:</strong> This form must be filed with a specification as required by 35 U.S.C. 112(a),
-    claims (optional), drawings (if necessary), and the required filing fee.
-  </div>
-
-  <div class="section">
-    <div class="section-title">INVENTION TITLE</div>
-    <div class="field-value" style="font-size: 12pt; font-weight: bold;">${data.title}</div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">INVENTOR(S)</div>
-    <table>
-      <thead>
-        <tr>
-          <th style="width: 40px;">#</th>
-          <th>Full Name (First, Middle, Last)</th>
-          <th>Residence (City, State/Province, Country)</th>
-          <th>Citizenship</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${inventorRows}
-      </tbody>
-    </table>
-  </div>
-
-  <div class="section">
-    <div class="section-title">CORRESPONDENCE ADDRESS</div>
-    <div class="field">
-      <span class="field-label">Name:</span>
-      <span class="field-value">${data.correspondenceAddress.name || ''}</span>
-    </div>
-    <div class="field">
-      <span class="field-label">Address:</span>
-      <span class="field-value">${data.correspondenceAddress.street}</span>
-    </div>
-    <div class="field">
-      <span class="field-label">City/State/Zip:</span>
-      <span class="field-value">${data.correspondenceAddress.city}, ${data.correspondenceAddress.state} ${data.correspondenceAddress.zipCode}</span>
-    </div>
-    <div class="field">
-      <span class="field-label">Country:</span>
-      <span class="field-value">${data.correspondenceAddress.country}</span>
-    </div>
-    ${data.correspondenceAddress.phone ? `
-    <div class="field">
-      <span class="field-label">Telephone:</span>
-      <span class="field-value">${data.correspondenceAddress.phone}</span>
-    </div>
-    ` : ''}
-    ${data.correspondenceAddress.email ? `
-    <div class="field">
-      <span class="field-label">Email:</span>
-      <span class="field-value">${data.correspondenceAddress.email}</span>
-    </div>
-    ` : ''}
-  </div>
-
-  ${data.attorneyInfo?.name ? `
-  <div class="section">
-    <div class="section-title">ATTORNEY/AGENT INFORMATION (Optional)</div>
-    <div class="field">
-      <span class="field-label">Name:</span>
-      <span class="field-value">${data.attorneyInfo.name}</span>
-    </div>
-    ${data.attorneyInfo.registrationNumber ? `
-    <div class="field">
-      <span class="field-label">Registration Number:</span>
-      <span class="field-value">${data.attorneyInfo.registrationNumber}</span>
-    </div>
-    ` : ''}
-    ${data.attorneyInfo.firm ? `
-    <div class="field">
-      <span class="field-label">Firm:</span>
-      <span class="field-value">${data.attorneyInfo.firm}</span>
-    </div>
-    ` : ''}
-  </div>
-  ` : ''}
-
-  <div class="section">
-    <div class="section-title">ENTITY STATUS</div>
-    ${entityCheckboxes}
-    <p style="font-size: 9pt; color: #666;">
-      Applicant certifies that they qualify for the indicated entity status.
-      Small entity status is available under 37 CFR 1.27. Micro entity status requires
-      certification under 37 CFR 1.29 (Form PTO/SB/15A or 15B).
-    </p>
-  </div>
-
-  ${data.governmentInterest ? `
-  <div class="section">
-    <div class="section-title">GOVERNMENT INTEREST</div>
-    <p>This invention was made with government support under:</p>
-    <div class="field-value">${data.governmentInterest}</div>
-    <p style="font-size: 9pt;">The government has certain rights in the invention.</p>
-  </div>
-  ` : ''}
-
-  <div class="section signature-section">
-    <div class="section-title">SIGNATURE</div>
-    <p>I hereby declare that all statements made herein of my own knowledge are true and that all
-    statements made on information and belief are believed to be true.</p>
-
-    <div class="signature-line"></div>
-    <div>Signature of Applicant or Attorney/Agent</div>
-
-    <div style="margin-top: 20px;">
-      <span class="field-label">Name (Printed):</span>
-      <span class="field-value" style="width: 250px; display: inline-block;"></span>
-    </div>
-
-    <div style="margin-top: 10px;">
-      <span class="field-label">Date:</span>
-      <span class="field-value" style="width: 150px; display: inline-block;">
-        ${data.filingDate ? data.filingDate.toLocaleDateString() : ''}
-      </span>
-    </div>
-  </div>
-
-  <div style="margin-top: 40px; font-size: 9pt; color: #666; border-top: 1px solid #ccc; padding-top: 10px;">
-    <p><strong>Privacy Act Statement:</strong> The Privacy Act of 1974 (P.L. 93-579) requires that you be given
-    certain information in connection with your submission of the attached form related to a patent application
-    or patent. Accordingly, pursuant to the requirements of the Act, please be advised that: (1) the general
-    authority for the collection of this information is 35 U.S.C. 2(b)(2); (2) furnishing of the information
-    solicited is voluntary; and (3) the principal purpose for which the information is used by the U.S. Patent
-    and Trademark Office is to process and/or examine your submission related to a patent application or patent.</p>
-  </div>
-</body>
-</html>
-  `;
+function drawBox(doc: jsPDF, x: number, y: number, w: number, h: number, fill = false) {
+  if (fill) {
+    doc.setFillColor(240, 240, 240);
+    doc.rect(x, y, w, h, 'FD');
+  } else {
+    doc.rect(x, y, w, h, 'S');
+  }
 }
 
-export function generateCoverSheetPDF(data: CoverSheetData): jsPDF {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'letter'
-  });
+function checkbox(doc: jsPDF, x: number, y: number, checked: boolean) {
+  doc.rect(x, y - 7, 8, 8, 'S');
+  if (checked) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('X', x + 1.8, y - 0.5);
+    doc.setFont('helvetica', 'normal');
+  }
+}
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 20;
-  const contentWidth = pageWidth - (margin * 2);
-  let y = 15;
+function needsNewPage(doc: jsPDF, y: number, needed: number): number {
+  if (y + needed > PAGE_HEIGHT - MARGIN) {
+    doc.addPage();
+    return MARGIN + 10;
+  }
+  return y;
+}
 
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text('PTO/SB/16', pageWidth - margin, y, { align: 'right' });
-  y += 4;
+export function generateSB16PDF(data: CoverSheetData): jsPDF {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+  let y = MARGIN;
+
+  // ---- Header ----
+  doc.setFontSize(SMALL);
   doc.setFont('helvetica', 'normal');
-  doc.text('Doc Code: PROVAPP', pageWidth - margin, y, { align: 'right' });
-  y += 10;
+  doc.text('PTO/SB/16 (09-23)', PAGE_WIDTH - MARGIN, y, { align: 'right' });
+  y += LINE;
+  doc.text('Approved for use through 01/31/2026. OMB 0651-0032', PAGE_WIDTH - MARGIN, y, { align: 'right' });
+  y += LINE;
+  doc.text('U.S. Patent and Trademark Office; U.S. DEPARTMENT OF COMMERCE', PAGE_WIDTH - MARGIN, y, { align: 'right' });
+  y += LINE * 1.5;
 
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text('PROVISIONAL APPLICATION FOR PATENT', pageWidth / 2, y, { align: 'center' });
-  y += 6;
-  doc.setFontSize(11);
-  doc.text('COVER SHEET', pageWidth / 2, y, { align: 'center' });
-  y += 8;
+  doc.text('PROVISIONAL APPLICATION FOR PATENT COVER SHEET', PAGE_WIDTH / 2, y, { align: 'center' });
+  y += LINE * 1.2;
 
-  doc.setFontSize(9);
+  doc.setFontSize(NORMAL);
   doc.setFont('helvetica', 'normal');
-  const subtitle = 'This is a request for filing a PROVISIONAL APPLICATION FOR PATENT under 37 CFR 1.53(c)';
-  doc.text(subtitle, pageWidth / 2, y, { align: 'center' });
-  y += 12;
+  doc.text('This is a request for filing a PROVISIONAL APPLICATION FOR PATENT under 37 CFR 1.53(c).', PAGE_WIDTH / 2, y, { align: 'center' });
+  y += LINE * 2;
 
+  // ---- Docket / Application Number bar ----
+  drawBox(doc, MARGIN, y - 10, CONTENT_WIDTH, 28, true);
+  doc.setFontSize(SMALL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DOCKET NUMBER (if applicable):', MARGIN + 5, y + 2);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.docketNumber || data.attorneyInfo?.docketNumber || '', MARGIN + 170, y + 2);
+  doc.setFont('helvetica', 'bold');
+  doc.text('APPLICATION NUMBER (if known):', PAGE_WIDTH / 2 + 10, y + 2);
+  doc.setFont('helvetica', 'normal');
+  doc.text('', PAGE_WIDTH / 2 + 190, y + 2);
+  y += LINE * 3;
+
+  // ---- INVENTION TITLE ----
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('INVENTION TITLE', MARGIN, y);
+  y += LINE;
+  drawBox(doc, MARGIN, y - 10, CONTENT_WIDTH, 30);
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('INVENTION TITLE', margin, y);
-  y += 5;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  const titleLines = doc.splitTextToSize(data.title, contentWidth);
-  doc.text(titleLines, margin, y);
-  y += titleLines.length * 5 + 3;
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 10;
+  const titleLines = doc.splitTextToSize(data.title, CONTENT_WIDTH - 10);
+  doc.text(titleLines, MARGIN + 5, y + 2);
+  y += 30 + LINE;
 
-  doc.setFontSize(10);
+  // ---- INVENTOR(S) ----
+  doc.setFontSize(NORMAL);
   doc.setFont('helvetica', 'bold');
-  doc.text('INVENTOR(S)', margin, y);
-  y += 6;
+  doc.text('INVENTOR(S) / APPLICANT(S)', MARGIN, y);
+  y += LINE;
 
-  doc.setFontSize(9);
-  const colWidths = [10, 55, 60, 40];
-  const headers = ['#', 'Full Name', 'Residence', 'Citizenship'];
-
-  doc.setFillColor(240, 240, 240);
-  doc.rect(margin, y - 4, contentWidth, 7, 'F');
+  // Table header
+  const colWidths = [20, 160, 150, 80, 100];
+  const colHeaders = ['#', 'Given Name, Middle, Family Name', 'Residence (City, State, Country)', 'Citizenship', 'Mailing Address'];
+  drawBox(doc, MARGIN, y - 10, CONTENT_WIDTH, 16, true);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'bold');
-  let xPos = margin + 2;
-  headers.forEach((header, i) => {
-    doc.text(header, xPos, y);
+  let xPos = MARGIN + 3;
+  colHeaders.forEach((h, i) => {
+    doc.text(h, xPos, y);
     xPos += colWidths[i];
   });
-  y += 5;
+  y += LINE + 4;
 
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(SMALL);
   data.inventors.forEach((inv, idx) => {
-    xPos = margin + 2;
-    doc.text(String(idx + 1), xPos, y);
+    y = needsNewPage(doc, y, 20);
+    const rowY = y;
+    drawBox(doc, MARGIN, rowY - 10, CONTENT_WIDTH, 18);
+    xPos = MARGIN + 3;
+    doc.text(String(idx + 1), xPos, rowY);
     xPos += colWidths[0];
-    doc.text(inv.fullName.substring(0, 30), xPos, y);
+    doc.text(inv.fullName.substring(0, 40), xPos, rowY);
     xPos += colWidths[1];
-    const residence = `${inv.residence.city}, ${inv.residence.state}`;
-    doc.text(residence.substring(0, 35), xPos, y);
+    const res = `${inv.residence.city}${inv.residence.state ? ', ' + inv.residence.state : ''}, ${inv.residence.country}`;
+    doc.text(res.substring(0, 35), xPos, rowY);
     xPos += colWidths[2];
-    doc.text(inv.citizenship, xPos, y);
-    y += 5;
+    doc.text((inv.citizenship || '').substring(0, 15), xPos, rowY);
+    xPos += colWidths[3];
+    if (inv.mailingAddress) {
+      const addr = `${inv.mailingAddress.city}, ${inv.mailingAddress.state}`;
+      doc.text(addr.substring(0, 25), xPos, rowY);
+    }
+    y += 18;
   });
-  y += 8;
 
-  doc.setFontSize(10);
+  // Empty rows for additional inventors
+  for (let i = data.inventors.length; i < Math.max(data.inventors.length, 3); i++) {
+    y = needsNewPage(doc, y, 20);
+    drawBox(doc, MARGIN, y - 10, CONTENT_WIDTH, 18);
+    xPos = MARGIN + 3;
+    doc.text(String(i + 1), xPos, y);
+    y += 18;
+  }
+
+  y += LINE;
+
+  // ---- CORRESPONDENCE ADDRESS ----
+  y = needsNewPage(doc, y, 120);
+  doc.setFontSize(NORMAL);
   doc.setFont('helvetica', 'bold');
-  doc.text('CORRESPONDENCE ADDRESS', margin, y);
-  y += 6;
-  doc.setFontSize(9);
+  doc.text('CORRESPONDENCE ADDRESS', MARGIN, y);
+  y += LINE;
+  drawBox(doc, MARGIN, y - 10, CONTENT_WIDTH, 95);
+
+  doc.setFontSize(SMALL);
   doc.setFont('helvetica', 'normal');
-
-  if (data.correspondenceAddress.name) {
-    doc.text(`Name: ${data.correspondenceAddress.name}`, margin, y);
-    y += 4;
-  }
-  doc.text(`Address: ${data.correspondenceAddress.street}`, margin, y);
-  y += 4;
-  doc.text(`City/State/Zip: ${data.correspondenceAddress.city}, ${data.correspondenceAddress.state} ${data.correspondenceAddress.zipCode}`, margin, y);
-  y += 4;
-  doc.text(`Country: ${data.correspondenceAddress.country}`, margin, y);
-  y += 4;
-  if (data.correspondenceAddress.phone) {
-    doc.text(`Phone: ${data.correspondenceAddress.phone}`, margin, y);
-    y += 4;
-  }
-  if (data.correspondenceAddress.email) {
-    doc.text(`Email: ${data.correspondenceAddress.email}`, margin, y);
-    y += 4;
-  }
-  y += 8;
-
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('ENTITY STATUS', margin, y);
-  y += 6;
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-
-  const entityOptions = [
-    { value: 'regular', label: 'Regular Entity' },
-    { value: 'small_entity', label: 'Small Entity (37 CFR 1.27)' },
-    { value: 'micro_entity', label: 'Micro Entity (37 CFR 1.29)' }
+  const addr = data.correspondenceAddress;
+  const addrLines = [
+    { label: 'Name:', value: addr.name || '' },
+    { label: 'Address:', value: addr.street },
+    { label: 'City:', value: addr.city },
+    { label: 'State/Province:', value: addr.state },
+    { label: 'Zip/Postal Code:', value: addr.zipCode },
+    { label: 'Country:', value: addr.country },
+    { label: 'Telephone:', value: addr.phone || '' },
+    { label: 'Email:', value: addr.email || '' },
   ];
 
-  entityOptions.forEach(opt => {
-    const checked = data.entityStatus === opt.value;
-    doc.rect(margin, y - 3, 3, 3);
-    if (checked) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('X', margin + 0.5, y - 0.5);
-      doc.setFont('helvetica', 'normal');
-    }
-    doc.text(opt.label, margin + 6, y);
-    y += 5;
+  const addrStartY = y;
+  addrLines.forEach((line, i) => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(line.label, MARGIN + 5, addrStartY + i * LINE);
+    doc.setFont('helvetica', 'normal');
+    doc.text(line.value, MARGIN + 90, addrStartY + i * LINE);
   });
-  y += 8;
+  y += 95 + LINE;
 
-  doc.setFontSize(10);
+  // ---- ATTORNEY/AGENT (Optional) ----
+  y = needsNewPage(doc, y, 70);
+  doc.setFontSize(NORMAL);
   doc.setFont('helvetica', 'bold');
-  doc.text('SIGNATURE', margin, y);
-  y += 10;
-  doc.setFontSize(9);
+  doc.text('ATTORNEY/AGENT INFORMATION (if applicable)', MARGIN, y);
+  y += LINE;
+  drawBox(doc, MARGIN, y - 10, CONTENT_WIDTH, 50);
+
+  doc.setFontSize(SMALL);
   doc.setFont('helvetica', 'normal');
+  const att = data.attorneyInfo || {};
+  const attLines = [
+    { label: 'Name:', value: att.name || '' },
+    { label: 'Registration Number:', value: att.registrationNumber || '' },
+    { label: 'Firm Name:', value: att.firm || '' },
+  ];
+  const attStartY = y;
+  attLines.forEach((line, i) => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(line.label, MARGIN + 5, attStartY + i * LINE);
+    doc.setFont('helvetica', 'normal');
+    doc.text(line.value, MARGIN + 120, attStartY + i * LINE);
+  });
+  y += 50 + LINE;
 
-  doc.line(margin, y, margin + 80, y);
-  y += 4;
-  doc.text('Signature', margin, y);
-  y += 8;
+  // ---- ENTITY STATUS ----
+  y = needsNewPage(doc, y, 50);
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ENTITY STATUS', MARGIN, y);
+  y += LINE + 2;
 
-  doc.text('Name (Printed): ________________________________', margin, y);
-  y += 6;
-  const dateStr = data.filingDate ? data.filingDate.toLocaleDateString() : '________________';
-  doc.text(`Date: ${dateStr}`, margin, y);
+  doc.setFontSize(SMALL);
+  doc.setFont('helvetica', 'normal');
+  const entities: { value: EntityStatus; label: string }[] = [
+    { value: 'micro_entity', label: 'Micro Entity (37 CFR 1.29)' },
+    { value: 'small_entity', label: 'Small Entity (37 CFR 1.27)' },
+    { value: 'regular', label: 'Regular Undiscounted' },
+  ];
+  entities.forEach(e => {
+    checkbox(doc, MARGIN + 5, y, data.entityStatus === e.value);
+    doc.text(e.label, MARGIN + 18, y);
+    y += LINE + 2;
+  });
+
+  y += LINE;
+
+  // ---- GOVERNMENT INTEREST ----
+  if (data.governmentInterest) {
+    y = needsNewPage(doc, y, 50);
+    doc.setFontSize(NORMAL);
+    doc.setFont('helvetica', 'bold');
+    doc.text('U.S. GOVERNMENT INTEREST', MARGIN, y);
+    y += LINE;
+    drawBox(doc, MARGIN, y - 10, CONTENT_WIDTH, 35);
+    doc.setFontSize(SMALL);
+    doc.setFont('helvetica', 'normal');
+    const govLines = doc.splitTextToSize(data.governmentInterest, CONTENT_WIDTH - 10);
+    doc.text(govLines, MARGIN + 5, y);
+    y += 35 + LINE;
+  }
+
+  // ---- PAGE 2: SIGNATURE ----
+  doc.addPage();
+  y = MARGIN;
+
+  // Page 2 header
+  doc.setFontSize(SMALL);
+  doc.setFont('helvetica', 'normal');
+  doc.text('PTO/SB/16 (09-23)', PAGE_WIDTH - MARGIN, y, { align: 'right' });
+  y += LINE;
+  doc.text(`Application Number: ________    Docket Number: ${data.docketNumber || data.attorneyInfo?.docketNumber || '________'}`, MARGIN, y);
+  y += LINE;
+  doc.text(`Title: ${data.title.substring(0, 80)}`, MARGIN, y);
+  y += LINE * 2;
+
+  // Enclosed sections checklist
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ENCLOSED APPLICATION PARTS (check all that apply)', MARGIN, y);
+  y += LINE + 4;
+
+  doc.setFontSize(SMALL);
+  doc.setFont('helvetica', 'normal');
+  const enclosedItems = [
+    { label: 'Specification (description of the invention)', checked: true },
+    { label: 'Drawing(s)', checked: true },
+    { label: 'Application Data Sheet (see 37 CFR 1.76)', checked: false },
+    { label: 'Cover Sheet (PTO/SB/16)', checked: true },
+    { label: 'Fees (filing fee, search fee, examination fee)', checked: false },
+    { label: 'Inventor\'s Oath or Declaration', checked: false },
+    { label: 'Claims', checked: false },
+    { label: 'Abstract', checked: true },
+  ];
+  enclosedItems.forEach(item => {
+    checkbox(doc, MARGIN + 5, y, item.checked);
+    doc.text(item.label, MARGIN + 18, y);
+    y += LINE + 2;
+  });
+
+  y += LINE * 2;
+
+  // Authorization for email
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('AUTHORIZATION TO CORRESPOND VIA EMAIL', MARGIN, y);
+  y += LINE + 2;
+  doc.setFontSize(SMALL);
+  doc.setFont('helvetica', 'normal');
+  const emailAuth = `I hereby authorize the USPTO to correspond with me via email at the following address: ${data.correspondenceAddress.email || '________________________'}`;
+  const emailLines = doc.splitTextToSize(emailAuth, CONTENT_WIDTH);
+  doc.text(emailLines, MARGIN, y);
+  y += emailLines.length * LINE + LINE * 2;
+
+  // Signature section
+  doc.setFontSize(NORMAL);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SIGNATURE', MARGIN, y);
+  y += LINE + 4;
+
+  doc.setFontSize(SMALL);
+  doc.setFont('helvetica', 'normal');
+  const sigParagraph = 'I hereby declare that all statements made herein of my own knowledge are true and that all statements made on information and belief are believed to be true; and further that these statements were made with the knowledge that willful false statements and the like so made are punishable by fine or imprisonment, or both, under 18 U.S.C. 1001 and that such willful false statements may jeopardize the validity of the application or any patent issued thereon.';
+  const sigLines = doc.splitTextToSize(sigParagraph, CONTENT_WIDTH);
+  doc.text(sigLines, MARGIN, y);
+  y += sigLines.length * LINE + LINE * 2;
+
+  // Signature lines
+  doc.line(MARGIN, y, MARGIN + 250, y);
+  y += LINE;
+  doc.text('Signature', MARGIN, y);
+  y += LINE * 2;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Name (Print/Type):', MARGIN, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.signatureName || data.inventors[0]?.fullName || '', MARGIN + 110, y);
+  doc.line(MARGIN + 108, y + 2, MARGIN + 300, y + 2);
+  y += LINE * 1.5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Date:', MARGIN, y);
+  doc.setFont('helvetica', 'normal');
+  const dateStr = data.signatureDate || data.filingDate?.toLocaleDateString() || new Date().toLocaleDateString();
+  doc.text(dateStr, MARGIN + 110, y);
+  doc.line(MARGIN + 108, y + 2, MARGIN + 250, y + 2);
+  y += LINE * 3;
+
+  // Privacy Act Notice
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'italic');
+  const privacyNotice = 'PRIVACY ACT STATEMENT: The Privacy Act of 1974 (P.L. 93-579) requires that you be given certain information in connection with your submission. The authority for collecting this information is 35 U.S.C. 2(b)(2), 111, and 37 CFR 1.51. Furnishing this information is voluntary; however, failure to furnish the requested information may prevent processing of your submission. The information is used by the USPTO to process your submission and may be disseminated in accordance with the Privacy Act.';
+  const privacyLines = doc.splitTextToSize(privacyNotice, CONTENT_WIDTH);
+  doc.text(privacyLines, MARGIN, y);
 
   return doc;
 }
 
-export function downloadCoverSheet(data: CoverSheetData, format: 'pdf' | 'html' = 'pdf'): void {
-  if (format === 'html') {
-    const html = generateCoverSheetHTML(data);
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `SB16_Cover_Sheet_${data.title.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-  } else {
-    const pdf = generateCoverSheetPDF(data);
-    pdf.save(`SB16_Cover_Sheet_${data.title.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
-  }
-}
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
 
 export function validateCoverSheetData(data: Partial<CoverSheetData>): {
   valid: boolean;
@@ -465,7 +441,7 @@ export function createDefaultInventor(): Inventor {
       state: '',
       country: 'US'
     },
-    citizenship: 'US Citizen',
+    citizenship: 'US',
     mailingAddress: undefined
   };
 }
@@ -481,4 +457,97 @@ export function createDefaultCorrespondenceAddress(): CorrespondenceAddress {
     phone: '',
     email: ''
   };
+}
+
+// ---------------------------------------------------------------------------
+// Download helpers
+// ---------------------------------------------------------------------------
+
+export function downloadCoverSheet(data: CoverSheetData): void {
+  const pdf = generateSB16PDF(data);
+  pdf.save(`PTO_SB16_${data.title.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+}
+
+// Keep HTML generation for preview purposes
+export function generateCoverSheetHTML(data: CoverSheetData): string {
+  const inventorRows = data.inventors.map((inv, idx) => `
+    <tr>
+      <td style="padding: 6px 8px; border: 1px solid #ccc;">${idx + 1}</td>
+      <td style="padding: 6px 8px; border: 1px solid #ccc;">${inv.fullName}</td>
+      <td style="padding: 6px 8px; border: 1px solid #ccc;">${inv.residence.city}${inv.residence.state ? ', ' + inv.residence.state : ''}, ${inv.residence.country}</td>
+      <td style="padding: 6px 8px; border: 1px solid #ccc;">${inv.citizenship}</td>
+    </tr>
+  `).join('');
+
+  return `
+<div style="font-family: Arial, sans-serif; font-size: 10pt; line-height: 1.5; max-width: 700px;">
+  <div style="text-align: right; font-size: 8pt; color: #666;">PTO/SB/16 (09-23)</div>
+  <h2 style="text-align: center; margin: 10px 0 5px;">PROVISIONAL APPLICATION FOR PATENT COVER SHEET</h2>
+  <p style="text-align: center; font-size: 9pt; color: #555; margin: 0 0 15px;">
+    Request for filing a PROVISIONAL APPLICATION under 37 CFR 1.53(c)
+  </p>
+
+  ${data.docketNumber || data.attorneyInfo?.docketNumber ? `<p style="font-size: 9pt; background: #f5f5f5; padding: 4px 8px; border-radius: 4px;"><strong>Docket Number:</strong> ${data.docketNumber || data.attorneyInfo?.docketNumber}</p>` : ''}
+
+  <h3 style="border-bottom: 2px solid #000; padding-bottom: 3px; font-size: 10pt;">INVENTION TITLE</h3>
+  <p style="font-weight: bold; font-size: 11pt;">${data.title}</p>
+
+  <h3 style="border-bottom: 2px solid #000; padding-bottom: 3px; font-size: 10pt;">INVENTOR(S)</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 9pt;">
+    <thead>
+      <tr style="background: #f0f0f0;">
+        <th style="padding: 6px 8px; border: 1px solid #ccc; width: 30px;">#</th>
+        <th style="padding: 6px 8px; border: 1px solid #ccc;">Name</th>
+        <th style="padding: 6px 8px; border: 1px solid #ccc;">Residence</th>
+        <th style="padding: 6px 8px; border: 1px solid #ccc;">Citizenship</th>
+      </tr>
+    </thead>
+    <tbody>${inventorRows}</tbody>
+  </table>
+
+  <h3 style="border-bottom: 2px solid #000; padding-bottom: 3px; font-size: 10pt; margin-top: 15px;">CORRESPONDENCE ADDRESS</h3>
+  <div style="font-size: 9pt;">
+    ${data.correspondenceAddress.name ? `<div><strong>Name:</strong> ${data.correspondenceAddress.name}</div>` : ''}
+    <div><strong>Address:</strong> ${data.correspondenceAddress.street}</div>
+    <div><strong>City/State/Zip:</strong> ${data.correspondenceAddress.city}, ${data.correspondenceAddress.state} ${data.correspondenceAddress.zipCode}</div>
+    <div><strong>Country:</strong> ${data.correspondenceAddress.country}</div>
+    ${data.correspondenceAddress.phone ? `<div><strong>Phone:</strong> ${data.correspondenceAddress.phone}</div>` : ''}
+    ${data.correspondenceAddress.email ? `<div><strong>Email:</strong> ${data.correspondenceAddress.email}</div>` : ''}
+  </div>
+
+  ${data.attorneyInfo?.name ? `
+  <h3 style="border-bottom: 2px solid #000; padding-bottom: 3px; font-size: 10pt; margin-top: 15px;">ATTORNEY/AGENT</h3>
+  <div style="font-size: 9pt;">
+    <div><strong>Name:</strong> ${data.attorneyInfo.name}</div>
+    ${data.attorneyInfo.registrationNumber ? `<div><strong>Reg. Number:</strong> ${data.attorneyInfo.registrationNumber}</div>` : ''}
+    ${data.attorneyInfo.firm ? `<div><strong>Firm:</strong> ${data.attorneyInfo.firm}</div>` : ''}
+  </div>
+  ` : ''}
+
+  <h3 style="border-bottom: 2px solid #000; padding-bottom: 3px; font-size: 10pt; margin-top: 15px;">ENTITY STATUS</h3>
+  <div style="font-size: 9pt;">
+    <div>${data.entityStatus === 'micro_entity' ? '☑' : '☐'} Micro Entity (37 CFR 1.29)</div>
+    <div>${data.entityStatus === 'small_entity' ? '☑' : '☐'} Small Entity (37 CFR 1.27)</div>
+    <div>${data.entityStatus === 'regular' ? '☑' : '☐'} Regular Undiscounted</div>
+  </div>
+
+  ${data.governmentInterest ? `
+  <h3 style="border-bottom: 2px solid #000; padding-bottom: 3px; font-size: 10pt; margin-top: 15px;">GOVERNMENT INTEREST</h3>
+  <p style="font-size: 9pt;">${data.governmentInterest}</p>
+  ` : ''}
+
+  <div style="margin-top: 25px; border-top: 2px solid #000; padding-top: 10px;">
+    <h3 style="font-size: 10pt;">SIGNATURE</h3>
+    <div style="margin: 20px 0; border-bottom: 1px solid #000; width: 300px; height: 20px;"></div>
+    <div style="font-size: 9pt;">
+      <div><strong>Name:</strong> ${data.signatureName || data.inventors[0]?.fullName || ''}</div>
+      <div><strong>Date:</strong> ${data.signatureDate || new Date().toLocaleDateString()}</div>
+    </div>
+  </div>
+</div>`;
+}
+
+// Legacy export for backward compatibility
+export function generateCoverSheetPDF(data: CoverSheetData): jsPDF {
+  return generateSB16PDF(data);
 }
