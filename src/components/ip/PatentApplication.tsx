@@ -14,7 +14,8 @@ import {
   BarChart3,
   ClipboardCheck,
   Trash2,
-  Users
+  Users,
+  Scale
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProject } from '../../contexts/ProjectContext';
@@ -68,8 +69,9 @@ import { PatentExportTab } from './patent/PatentExportTab';
 import { PatentPriorArtTab } from './patent/PatentPriorArtTab';
 import { PatentAnalysisTab } from './patent/PatentAnalysisTab';
 import { PatentFilingTab } from './patent/PatentFilingTab';
+import { PatentLegalBriefTab } from './patent/PatentLegalBriefTab';
 
-type TabId = 'overview' | 'applicant' | 'specification' | 'claims' | 'drawings' | 'abstract' | 'prior-art' | 'analysis' | 'filing' | 'export';
+type TabId = 'overview' | 'applicant' | 'specification' | 'claims' | 'drawings' | 'abstract' | 'prior-art' | 'analysis' | 'legal-brief' | 'filing' | 'export';
 
 // --- Generation Progress Modal ---
 
@@ -654,6 +656,7 @@ Respond with ONLY the JSON object.`;
     { id: 'abstract', label: 'Abstract', icon: BookOpen },
     { id: 'prior-art', label: 'Prior Art', icon: Scroll },
     { id: 'analysis', label: 'Analysis', icon: BarChart3 },
+    { id: 'legal-brief', label: 'Legal Brief', icon: Scale },
     { id: 'filing', label: 'Filing', icon: ClipboardCheck },
     { id: 'export', label: 'Export', icon: Download }
   ];
@@ -914,6 +917,13 @@ Respond with ONLY the JSON object.`;
                     onRunNoveltyAnalysis={handleRunNoveltyAnalysis}
                     onRunAliceRisk={handleRunAliceRisk}
                     hasClaims={selectedApp.claims.length > 0}
+                  />
+                )}
+
+                {activeTab === 'legal-brief' && (
+                  <PatentLegalBriefTab
+                    applicationId={selectedApp.id}
+                    projectId={projectId!}
                   />
                 )}
 
